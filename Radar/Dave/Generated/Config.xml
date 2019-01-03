@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Project MotherSystem_Version="" Name="Radar" Path="E:\Project Evaluation\infineon\FW_test\Radar">
+    <COMPILER>
+        <Name>ARM_GCC_HOME</Name>
+        <Version/>
+        <Memory_Model/>
+    </COMPILER>
+    <DEVICE>
+        <Sales_Code>XMC1302-T016x0032</Sales_Code>
+        <Description/>
+    </DEVICE>
+    <Generated_Files>
+        <Source_Files>
+            <Source_File>
+                <File_Name>DAVE.c</File_Name>
+                <Path>\Dave\Generated\DAVE.c</Path>
+                <Type>C File</Type>
+            </Source_File>
+        </Source_Files>
+        <Header_Files>
+            <Header_File>
+                <File_Name>DAVE.h</File_Name>
+                <Path>\Dave\Generated\DAVE.h</Path>
+                <Type>H File</Type>
+            </Header_File>
+            <Header_File>
+                <File_Name>DAVE_Common.h</File_Name>
+                <Path>\Dave\Generated\DAVE_Common.h</Path>
+                <Type>H File</Type>
+            </Header_File>
+        </Header_Files>
+        <Library_Files/>
+        <Assembly_Files/>
+    </Generated_Files>
+    <Include_Path>
+        <Path>\Libraries\XMCLib\inc</Path>
+        <Path>\User\Driver\flash</Path>
+        <Path>\Dave</Path>
+        <Path>\Dave\Generated\E_EEPROM_XMC1</Path>
+        <Path>\Dave\Generated</Path>
+        <Path>\User\Driver\MCU</Path>
+        <Path>\Libraries\RadarSense2GoL</Path>
+        <Path>\Libraries\RadarSense2GoL\bin</Path>
+        <Path>\Libraries\RadarSense2GoL\inc</Path>
+        <Path>\User</Path>
+        <Path>\User\APP</Path>
+        <Path>\User\CPU</Path>
+        <Path>\User\Driver</Path>
+        <Path>\User\Driver\gpio</Path>
+        <Path>\User\Driver\mem</Path>
+        <Path>\User\Driver\queue</Path>
+        <Path>\User\Driver\uart</Path>
+        <Path>\User\Message</Path>
+        <Path>\User\SCH</Path>
+        <Path>\Libraries\CMSIS\Include</Path>
+        <Path>\Libraries\CMSIS\Infineon\XMC1300_series\Include</Path>
+        <Path/>
+        <Path>\Libraries</Path>
+    </Include_Path>
+    <Preprocessor_Symbols>
+        <Assembler_Symbol>XMC1302_T016x0032=</Assembler_Symbol>
+        <Compiler_Symbol>XMC1302_T016x0032=</Compiler_Symbol>
+    </Preprocessor_Symbols>
+</Project>
