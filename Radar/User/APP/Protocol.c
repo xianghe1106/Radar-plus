@@ -144,6 +144,7 @@ static void GetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
 
 static void SetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
@@ -196,6 +197,7 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	{0xA2	, GetNotifyState						,1 },
 	{0xA3	, GetDistanceOffset						,1 },
 	{0xA4	, GetSummaryInfo						,9 },
+	{0xA5	, GetAmplitudeOffset					,1 },
 
 
 	/*---------------------------------------------------
@@ -548,6 +550,11 @@ static void GetNotifyState(ProtocolMsg_TypeDef ProtocolMsg)
 static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	ProtocolMsg.Output[0] = radar_factory_data.distance_offset[0];
+}
+
+static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	ProtocolMsg.Output[0] = radar_factory_data.amplitude_offset[0];
 }
 
 

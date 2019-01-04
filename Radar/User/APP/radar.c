@@ -145,7 +145,7 @@ void RADAR_Test(void)
 //	DIGITAL_GPIO_ToggleOutput(&LED_BLUE);
 }
 
-INT8U flash_bu[10];
+//INT8U flash_bu[10];
 void RADAR_Init(void)
 {
 	INT8U radar_flash_buffer[FLASH_BUFFER_SIZE];
@@ -178,42 +178,6 @@ void RADAR_Init(void)
 	radar_factory_data.distance.cal_table_type.table[5] = 358;		//3.0
 
 	radar_user_data.device_address = 0x30;
-
-
-
-//	Flash_EraseMemory(flash_page_factory);
-
-#if 0
-	radar_flash_buffer[0] = 1;
-	radar_flash_buffer[1] = 2;
-	radar_flash_buffer[2] = 3;
-	radar_flash_buffer[3] = 4;
-	radar_flash_buffer[4] = 5;
-//	FLASH_WriteSpecificPage(flash_page_user,radar_flash_buffer,5);
-
-
-#if 1
-	MEM_Clr(radar_flash_buffer, sizeof(radar_flash_buffer));
-	FLASH_ReadSpecificPage(flash_page_factory, radar_flash_buffer);
-
-//	XMC_FLASH_ReadBlocks(USER_BLOCK1, buffer, 2);
-
-	for(INT16U i = 0; i < sizeof(radar_flash_buffer); i++)
-	{
-		XMC_UART_CH_Transmit(XMC_UART0_CH0, radar_flash_buffer[i]);
-	}
-#endif
-
-#if 1
-	MEM_Clr(radar_flash_buffer, sizeof(radar_flash_buffer));
-	FLASH_ReadSpecificPage(flash_page_user, radar_flash_buffer);
-
-	for(INT16U i = 0; i < sizeof(radar_flash_buffer); i++)
-	{
-		XMC_UART_CH_Transmit(XMC_UART0_CH0, radar_flash_buffer[i]);
-	}
-#endif
-#endif
 }
 
 void RADAR_Process(void)
