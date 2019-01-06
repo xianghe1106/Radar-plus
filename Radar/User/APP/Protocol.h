@@ -91,6 +91,7 @@ typedef struct
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
+#define BUILD_VERSION							1
 
 #define START_BYTE								0x7E
 #define STOP_BYTE								0x7E

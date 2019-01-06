@@ -41,24 +41,42 @@ typedef struct
 	INT8U  orderType;	//
 	INT8U  minDistance;
 	INT8U  maxDistance;
-	INT16U table[6];
+	INT16U table[10];
 }DISTANCE_TABLE_Type;
 
 typedef struct
 {
-	INT8S distance_offset[8];
-	INT8S amplitude_offset[8];
-	union
-	{
-		INT8U cal_table[16];
+	INT8S  distance_offset[8];
+	INT16S amplitude_offset[8];
+
+//	union
+//	{
+//		INT8U cal_table[24];
 		DISTANCE_TABLE_Type cal_table_type;
-	}distance;
+//	}distance;
+
+	INT16U gesture_amp_point;
+	INT8U  gesture_spd_point;
 }RADAR_FACTORY_DATA_Type;
 
 typedef struct
 {
 	INT8U device_address;
 }RADAR_USER_DATA_Type;
+
+typedef enum
+{
+	NO_GESTURE_DETECTED = 0,
+	GESTURE_DETECTED = 1,
+	GESTURE_UNDEFINED = 2
+} RADAR_GESTURE_Type;
+
+typedef enum
+{
+	TOILET_COVER_CLOSED = 0,
+	TOILET_COVER_OPENED = 1
+} RADAR_TOILET_COVER_Type;
+
 
 /*
 *********************************************************************************************************
@@ -105,6 +123,8 @@ void RADAR_GetSpeed(INT8U *output);
 void RADAR_GetSignal(INT8U *output);
 void RADAR_GetAmplitude(INT8U *output);
 void RADAR_GetMotion(INT8U *output);
+void RADAR_GetGesture(INT8U *output);
+void RADAR_GetToiletCover(INT8U *output);
 
 
 #endif /* USER_APP_RADAR_H_ */

@@ -14,9 +14,12 @@
 
 #include "radar.h"
 #include <math.h>
+#include <stdlib.h>
 //#include "HostCommUART.h"
 #include "xmc_uart.h"
 #include <DAVE.h>
+
+#include "Message.h"
 
 /*
 *********************************************************************************************************
@@ -163,19 +166,39 @@ void RADAR_Init(void)
 
 
 	FLASH_ReadSpecificPage(flash_page_factory, radar_flash_buffer);
+	MEM_Clr(&radar_factory_data, sizeof(radar_factory_data));
 	MEM_Copy(&radar_factory_data, radar_flash_buffer, sizeof(radar_factory_data));
 
+	if(radar_factory_data.cal_table_type.planType != 'A')
+	{
+		radar_factory_data.cal_table_type.planType = 'A';
+		radar_factory_data.cal_table_type.orderType = '1';
 
-	radar_factory_data.distance.cal_table_type.planType = 'A';
-	radar_factory_data.distance.cal_table_type.orderType = '1';
-	radar_factory_data.distance.cal_table_type.minDistance = 5;		//0.5m
-	radar_factory_data.distance.cal_table_type.maxDistance = 30;	//3m
-	radar_factory_data.distance.cal_table_type.table[0] = 3544;		//0.5
-	radar_factory_data.distance.cal_table_type.table[1] = 2605;		//1.0 fake
-	radar_factory_data.distance.cal_table_type.table[2] = 1667;		//1.5
-	radar_factory_data.distance.cal_table_type.table[3] = 963;		//2.0
-	radar_factory_data.distance.cal_table_type.table[4] = 660;		//2.5 fake
-	radar_factory_data.distance.cal_table_type.table[5] = 358;		//3.0
+	#if 0
+		radar_factory_data.distance.cal_table_type.minDistance = 5;		//0.5m
+		radar_factory_data.distance.cal_table_type.maxDistance = 30;	//3m
+		radar_factory_data.distance.cal_table_type.table[0] = 3544;		//0.5
+		radar_factory_data.distance.cal_table_type.table[1] = 2605;		//1.0 fake
+		radar_factory_data.distance.cal_table_type.table[2] = 1667;		//1.5
+		radar_factory_data.distance.cal_table_type.table[3] = 963;		//2.0
+		radar_factory_data.distance.cal_table_type.table[4] = 660;		//2.5 fake
+		radar_factory_data.distance.cal_table_type.table[5] = 358;		//3.0
+	#endif
+
+		radar_factory_data.cal_table_type.minDistance = 5;		//0.5m
+		radar_factory_data.cal_table_type.maxDistance = 30;	//3m
+
+		radar_factory_data.cal_table_type.table[0] = 800;		//0.5
+		radar_factory_data.cal_table_type.table[1] = 220;		//1.0 fake
+		radar_factory_data.cal_table_type.table[2] = 190;		//1.5
+		radar_factory_data.cal_table_type.table[3] = 160;		//2.0
+		radar_factory_data.cal_table_type.table[4] = 150;		//2.5 fake
+		radar_factory_data.cal_table_type.table[5] = 120;		//3.0
+
+		radar_factory_data.gesture_amp_point = 1000;
+		radar_factory_data.gesture_spd_point = 20;	//2KM/H
+	}
+
 
 	radar_user_data.device_address = 0x30;
 }
@@ -391,62 +414,86 @@ void RADAR_GetDistance(INT8U *output)
 	INT16U value = 0;
 	INT16U buffer[2];
 	INT8U  i;
-	static INT16U distance_value = 0;
+	static INT16U new_distance_value = 0;
+	static INT16U cur_distance_value = 0;
+
+	static INT8U startup = 0;
+	INT8U state = 0;
+
+	XMC_RADARSENSE2GOL_MOTION_t motion;
 
 	Radar_SearchMaxMinSamplingData(g_sampling_data_I, BUFF_SIZE, buffer);
 
 	value = buffer[0] - buffer[1];
 
-	for(i = 0; i < 5; i++)
-	{
-		if(value > radar_factory_data.distance.cal_table_type.table[0])
+//	for(i = 0; i < 5; i++)
+//	{
+		if(value > radar_factory_data.cal_table_type.table[0])
 		{
-//			distance_value = 0;
+			state = 1;
+			new_distance_value = 50;
 		}
-		else if(value > radar_factory_data.distance.cal_table_type.table[1])
+		else if(value > radar_factory_data.cal_table_type.table[1])
 		{
-//			distance_value = 50;	//0.5
-
-			DistanceLinear(100, value, &radar_factory_data.distance.cal_table_type.table[1]);
+			state = 2;
+			new_distance_value = DistanceLinear(100, value, &radar_factory_data.cal_table_type.table[1]);
 		}
-		else if(value > radar_factory_data.distance.cal_table_type.table[2])
+		else if(value > radar_factory_data.cal_table_type.table[2])
 		{
-//			distance_value = 100;
-
-			distance_value = DistanceLinear(150, value, &radar_factory_data.distance.cal_table_type.table[2]);
+			state = 3;
+			new_distance_value = DistanceLinear(150, value, &radar_factory_data.cal_table_type.table[2]);
 		}
-		else if(value > radar_factory_data.distance.cal_table_type.table[3])
+		else if(value > radar_factory_data.cal_table_type.table[3])
 		{
-//			distance_value = 150;
-
-			distance_value = DistanceLinear(200, value, &radar_factory_data.distance.cal_table_type.table[3]);
+			state = 4;
+			new_distance_value = DistanceLinear(200, value, &radar_factory_data.cal_table_type.table[3]);
 		}
-		else if(value > radar_factory_data.distance.cal_table_type.table[4])
+		else if(value > radar_factory_data.cal_table_type.table[4])
 		{
-//			distance_value = 200;
-
-			distance_value = DistanceLinear(250, value, &radar_factory_data.distance.cal_table_type.table[4]);
+			state = 5;
+			new_distance_value = DistanceLinear(250, value, &radar_factory_data.cal_table_type.table[4]);
 		}
-		else if(value > radar_factory_data.distance.cal_table_type.table[5])
+		else if(value > radar_factory_data.cal_table_type.table[5])
 		{
-//			distance_value = 250;
-
-			distance_value = DistanceLinear(300, value, &radar_factory_data.distance.cal_table_type.table[5]);
-		}
-		else if(value > radar_factory_data.distance.cal_table_type.table[6])
-		{
-//			distance_value = 300;
+			state = 6;
+			new_distance_value = DistanceLinear(300, value, &radar_factory_data.cal_table_type.table[5]);
 		}
 		else
 		{
-//			distance_value = 400;
+			state = 8;
+//			new_distance_value = 400;
+		}
+//	}
+
+	if(startup == 0)
+	{
+		startup = 1;
+
+		cur_distance_value = new_distance_value;
+	}
+
+	RADAR_GetMotion(&motion);
+
+	if(motion == XMC_MOTION_DETECT_APPROACHING)
+	{
+		if(new_distance_value <= cur_distance_value)
+		{
+			cur_distance_value = new_distance_value;
+		}
+	}
+	else if(motion == XMC_MOTION_DETECT_DEPARTING)
+	{
+		if(new_distance_value >= cur_distance_value)
+		{
+			cur_distance_value = new_distance_value;
 		}
 	}
 
+	output[0] = WORD_HIGH(cur_distance_value);
+	output[1] = WORD_LOW(cur_distance_value);
 
-
-	output[0] = WORD_HIGH(distance_value);
-	output[1] = WORD_LOW(distance_value);
+//	output[0] = WORD_HIGH(state);
+//	output[1] = WORD_LOW(state);
 
 
 //	output[0] = 0;
@@ -490,5 +537,76 @@ void RADAR_GetMotion(INT8U *output)
 	output[0] = g_motion;
 }
 
+void RADAR_GetGesture(INT8U *output)
+{
+	INT8U buffer[2];
+	INT16U cur_distance, cur_speed;
+	static RADAR_GESTURE_Type state = GESTURE_UNDEFINED;
+//	static INT8U startup = 0;
+//	static INT16U history_amplitude;
+
+//	RADAR_GetAmplitude(buffer);
+//	cur_amplitude = (buffer[0] << 8) + buffer[1];
+
+//	if(startup == 0)
+//	{
+//		startup = 1;
+
+//		history_amplitude = cur_amplitude;
+///	}
+
+	RADAR_GetSpeed(buffer);
+	cur_speed = get16(buffer);
+
+	RADAR_GetDistance(buffer);
+	cur_distance = get16(buffer);
+
+//	if((abs(cur_amplitude - history_amplitude) > radar_factory_data.gesture_amp_point)
+//	&& (cur_speed < radar_factory_data.gesture_spd_point))
+
+	if((cur_speed > radar_factory_data.gesture_spd_point)
+	&& (cur_distance < radar_factory_data.gesture_amp_point))
+	{
+		if(SCH_Get_Flag(Flag_GestureDelay) == 0)
+		{
+			SCH_Add_Flag(Flag_GestureDelay, SCH_FLAG_1000MS);
+
+			if(state == GESTURE_DETECTED)
+			{
+				state = NO_GESTURE_DETECTED;
+			}
+			else
+			{
+				state = GESTURE_DETECTED;
+			}
+		}
+	}
+
+	if(cur_distance >150)
+	{
+		state = NO_GESTURE_DETECTED;
+	}
+
+
+
+//	history_amplitude = cur_amplitude;
+
+	output[0] = state;
+}
+
+void RADAR_GetToiletCover(INT8U *output)
+{
+	INT8U  buffer[5];
+	RADAR_TOILET_COVER_Type state = TOILET_COVER_CLOSED;
+
+	RADAR_GetDistance(buffer);
+
+	if(get16(buffer) < 150)
+	{
+		state = TOILET_COVER_OPENED;
+	}
+
+	output[0] = state;
+}
 
 

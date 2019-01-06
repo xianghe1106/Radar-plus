@@ -139,17 +139,27 @@ NOTIFY_STATE_Type  notify_state = notify_enable;
 
 static INT8U zxUTILS_Crc8(INT8U *ucBuf, INT8U ucLen);
 
+static void SetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+
+
 static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 
-static void SetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg);
-static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
-static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
-static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
+
+static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg);
+
+
+static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetAmplitude(ProtocolMsg_TypeDef ProtocolMsg);
 
 /*
 *********************************************************************************************************
@@ -185,27 +195,33 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	{0x81 	, SetNotifyState						,0 },
 	{0x82 	, SetDistanceOffset						,0 },
 	{0x83 	, SetAmplitudeOffset					,0 },
+	{0x84 	, SetGestureTripPoint					,0 },
 
 
 	/*---------------------------------------------------
 	--
-	-- Internal get command: 0xB0 to 0xDF
+	-- Internal get command: 0xA0 to 0xDF
 	--
 	----------------------------------------------------*/
 	{0xA0 	, GetFirmwareVersion					,2 },
 	{0xA1	, GetDeviceAddress						,1 },
 	{0xA2	, GetNotifyState						,1 },
 	{0xA3	, GetDistanceOffset						,1 },
-	{0xA4	, GetSummaryInfo						,9 },
-	{0xA5	, GetAmplitudeOffset					,1 },
+	{0xA4	, GetSummaryInfo						,11},
+	{0xA5	, GetAmplitudeOffset					,2 },
+	{0xA6	, GetGestureTripPoint					,3 },
 
 
 	/*---------------------------------------------------
 	--
-	-- Internal calibration command: 0xE0 to 0xFE
+	-- Internal calibration command: 0xD0 to 0xFE
 	--
 	----------------------------------------------------*/
+	{0xD0 	, LoadCalibrationData					,0 },
 
+
+	{0xE0 	, GetCalibrationData					,0 },
+	{0xE1 	, GetAmplitude							,2 },
 
 
 	{0xFFFF , NULL									,0 }
@@ -365,13 +381,14 @@ void Protocol_heart_beat(void)
 {
 	INT8U  len;//tx_bufer
 	INT8U  buffer[5];
+	INT16U cur_distance;
 
 	if(notify_state != notify_enable)
 	{
 		return;
 	}
 
-	len = 9;
+	len = 11;
 
 	tx_buffer[0] = radar_user_data.device_address;	//device_adress
 	tx_buffer[1] = len;	//len
@@ -399,7 +416,14 @@ void Protocol_heart_beat(void)
 	tx_buffer[11] = buffer[0];	//Amplitude
 	tx_buffer[12] = buffer[1];
 
-	tx_buffer[13] = zxUTILS_Crc8(&tx_buffer[0], len + 4) & 0xFF;	//check byte
+	RADAR_GetToiletCover(buffer);
+	tx_buffer[13] = buffer[0];
+
+	RADAR_GetGesture(buffer);
+	tx_buffer[14] = buffer[0];
+
+
+	tx_buffer[15] = zxUTILS_Crc8(&tx_buffer[0], len + 4) & 0xFF;	//check byte
 
 	send_uart_data(tx_buffer, len + 5);
 }
@@ -554,7 +578,16 @@ static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	ProtocolMsg.Output[0] = radar_factory_data.amplitude_offset[0];
+	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.amplitude_offset[0]);
+	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.amplitude_offset[0]);
+}
+
+static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.gesture_amp_point);
+	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.gesture_amp_point);
+
+	ProtocolMsg.Output[2] = radar_factory_data.gesture_spd_point;
 }
 
 
@@ -580,6 +613,12 @@ static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg)
 	RADAR_GetAmplitude(buffer);
 	ProtocolMsg.Output[7] = buffer[0];	//Amplitude
 	ProtocolMsg.Output[8] = buffer[1];
+
+	RADAR_GetToiletCover(buffer);
+	ProtocolMsg.Output[10] = buffer[0];
+
+	RADAR_GetGesture(buffer);
+	ProtocolMsg.Output[9] = buffer[0];
 }
 
 
@@ -646,14 +685,16 @@ static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+	INT16S para_data;
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
-	radar_factory_data_bak.amplitude_offset[0] = (INT8S)ProtocolMsg.Para[0];
+	para_data = (INT16S)((ProtocolMsg.Para[0] << 8) + ProtocolMsg.Para[1]);
+	radar_factory_data_bak.amplitude_offset[0] = para_data;
 
 	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
 	{
-		radar_factory_data.amplitude_offset[0] = (INT8S)ProtocolMsg.Para[0];
+		radar_factory_data.amplitude_offset[0] = para_data;
 	}
 	else
 	{
@@ -661,4 +702,92 @@ static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
 		return;
 	}
 }
+
+static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+	INT16U para_amplitude, para_speed;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+	para_amplitude = (ProtocolMsg.Para[0] << 8) + ProtocolMsg.Para[1];
+	para_speed = ProtocolMsg.Para[2];
+
+	radar_factory_data_bak.gesture_amp_point = para_amplitude;
+	radar_factory_data_bak.gesture_spd_point = para_speed;
+
+	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	{
+		radar_factory_data.gesture_amp_point = para_amplitude;
+		radar_factory_data.gesture_spd_point = para_speed;
+	}
+	else
+	{
+		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		return;
+	}
+}
+
+
+static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	INT8U i, size;
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+//	MEM_Copy(&radar_factory_data_bak.cal_table_type, ProtocolMsg.Para, sizeof(radar_factory_data_bak.cal_table_type));
+
+	radar_factory_data_bak.cal_table_type.planType = ProtocolMsg.Para[0];
+	radar_factory_data_bak.cal_table_type.orderType = ProtocolMsg.Para[1];
+	radar_factory_data_bak.cal_table_type.minDistance = ProtocolMsg.Para[2];
+	radar_factory_data_bak.cal_table_type.maxDistance = ProtocolMsg.Para[3];
+
+	size = sizeof(radar_factory_data_bak.cal_table_type.table) / 2;
+	for(i = 0; i < size; i++)
+	{
+		radar_factory_data_bak.cal_table_type.table[i] = get16(&ProtocolMsg.Para[4 + 2*i]);
+	}
+
+
+	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	{
+		MEM_Copy(&radar_factory_data, &radar_factory_data_bak, sizeof(radar_factory_data));
+	}
+	else
+	{
+		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		return;
+	}
+}
+
+static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	INT8U size, i;
+
+	*ProtocolMsg.DynamicLen = sizeof(radar_factory_data.cal_table_type);
+
+//	MEM_Copy(ProtocolMsg.Output, &radar_factory_data.cal_table_type, sizeof(radar_factory_data.cal_table_type));
+
+	ProtocolMsg.Output[0] = radar_factory_data.cal_table_type.planType;
+	ProtocolMsg.Output[1] = radar_factory_data.cal_table_type.orderType;
+	ProtocolMsg.Output[2] = radar_factory_data.cal_table_type.minDistance;
+	ProtocolMsg.Output[3] = radar_factory_data.cal_table_type.maxDistance;
+
+	size = sizeof(radar_factory_data.cal_table_type.table) / 2;
+	for(i = 0; i < size; i++)
+	{
+		ProtocolMsg.Output[4 + 2*i] = WORD_HIGH(radar_factory_data.cal_table_type.table[i]);
+		ProtocolMsg.Output[4 + 2*i + 1] = WORD_LOW(radar_factory_data.cal_table_type.table[i]);
+	}
+}
+
+static void GetAmplitude(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_GetAmplitude(ProtocolMsg.Output);
+}
+
+
+
+
 
