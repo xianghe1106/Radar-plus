@@ -91,7 +91,7 @@ int main(void)
 
 	SCH_Add_Task(Protocol_process 				, 		2  , 		10   );//RADAR_TestTime
 
-	SCH_Add_Task(Protocol_heart_beat 			, 		10 , 		16   );//Protocol_heart_beat
+	SCH_Add_Task(Protocol_heart_beat 			, 		10 , 		8   );//Protocol_heart_beat
 
 	SCH_Start();
 

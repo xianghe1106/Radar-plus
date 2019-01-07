@@ -381,7 +381,7 @@ void Protocol_heart_beat(void)
 {
 	INT8U  len;//tx_bufer
 	INT8U  buffer[5];
-	INT16U cur_distance;
+//	INT16U cur_distance;
 
 	if(notify_state != notify_enable)
 	{
@@ -455,8 +455,6 @@ void Protocol_process(void)
 	if((ptr_buffer[0] != START_BYTE)
 		|| (ptr_buffer[rxLen + 1] != STOP_BYTE))
 	{
-//		XMC_UART_CH_Transmit(XMC_UART0_CH0, 0x01);
-
 		packet_buffer.process_index++;
 		packet_buffer.process_index = packet_buffer.process_index % PACKET_MAX_ENTRIES;
 		return;
@@ -465,7 +463,6 @@ void Protocol_process(void)
 	packet_address = ptr_buffer[1];
 	if(packet_address != radar_user_data.device_address)
 	{
-//		XMC_UART_CH_Transmit(XMC_UART0_CH0, 0x02);
 		packet_buffer.process_index++;
 		packet_buffer.process_index = packet_buffer.process_index % PACKET_MAX_ENTRIES;
 		return;
@@ -529,12 +526,10 @@ void Protocol_process(void)
 
 	tx_buffer[0] = radar_user_data.device_address;
 	tx_buffer[1] = staticLen + dynamicLen + 5;
-//	tx_buffer[2] = staticLen + dynamicLen + 6;
 	tx_buffer[2] = cmdCode;
 	tx_buffer[3] = errorCode;
 
 	crcValue = zxUTILS_Crc8(&tx_buffer[0], tx_buffer[1] - 1);
-//	XMC_UART_CH_Transmit(XMC_UART0_CH0, crcValue);
 	tx_buffer[tx_buffer[1] - 1] = crcValue;
 
 	send_uart_data(tx_buffer, tx_buffer[1]);

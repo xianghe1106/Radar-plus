@@ -40,7 +40,8 @@
 ==============================================================================
 */
 
-#define SAMPLING_FREQ_HZ (3000) 	/**< sampling frequency in Hz.
+//#define SAMPLING_FREQ_HZ (3000) 	/**< sampling frequency in Hz.
+#define SAMPLING_FREQ_HZ (1408) 	/**< sampling frequency in Hz.
 									PLEASE CHANGE ACCORDING TO YOUR
 									REQUIREMENTS!!! */
 #define DETECTION_THRESHOLD (200) 	/**< threshold of fft magnitude. all
@@ -48,7 +49,7 @@
  	 	 	 	 	 	 	 	 	ignored.
  	 	 	 	 	 	 	 	 	PLEASE CHANGE ACCORDING TO YOUR
  	 	 	 	 	 	 	 	 	REQUIREMENTS!!! */
-#define FFT_SIZE (128)    			/**< number of fft points */
+#define FFT_SIZE (64)    			/**< number of fft points */
 #define UART_RAW_DATA (1) 			/**control for execution of UART feature to
 									transmit raw IQ from ADC. BE CAREFUL: WHEN
 									SENDING RAW DATA VIA UART INTERFACE GUI

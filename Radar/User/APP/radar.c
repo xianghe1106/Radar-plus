@@ -70,7 +70,7 @@ RADAR_USER_DATA_Type	radar_user_data;
 XMC_RADARSENSE2GOL_TIMING_t radarsense2gol_timing =
 {
 		.t_sample_us = (1.0 / SAMPLING_FREQ_HZ) * 1000.0 * 1000.0, /**< sample time in us = (1/sample_frequency) * 1000 * 1000 */
-		.t_cycle_ms = 300,           /**< 300 ms */
+		.t_cycle_ms = 100,           /**< 300 ms */
 		.N_exponent_samples = log2(BUFF_SIZE)
 };
 
@@ -413,12 +413,11 @@ void RADAR_GetDistance(INT8U *output)
 {
 	INT16U value = 0;
 	INT16U buffer[2];
-	INT8U  i;
 	static INT16U new_distance_value = 0;
 	static INT16U cur_distance_value = 0;
 
 	static INT8U startup = 0;
-	INT8U state = 0;
+//	INT8U state = 0;
 
 	XMC_RADARSENSE2GOL_MOTION_t motion;
 
@@ -430,37 +429,37 @@ void RADAR_GetDistance(INT8U *output)
 //	{
 		if(value > radar_factory_data.cal_table_type.table[0])
 		{
-			state = 1;
+//			state = 1;
 			new_distance_value = 50;
 		}
 		else if(value > radar_factory_data.cal_table_type.table[1])
 		{
-			state = 2;
+//			state = 2;
 			new_distance_value = DistanceLinear(100, value, &radar_factory_data.cal_table_type.table[1]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[2])
 		{
-			state = 3;
+//			state = 3;
 			new_distance_value = DistanceLinear(150, value, &radar_factory_data.cal_table_type.table[2]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[3])
 		{
-			state = 4;
+//			state = 4;
 			new_distance_value = DistanceLinear(200, value, &radar_factory_data.cal_table_type.table[3]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[4])
 		{
-			state = 5;
+//			state = 5;
 			new_distance_value = DistanceLinear(250, value, &radar_factory_data.cal_table_type.table[4]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[5])
 		{
-			state = 6;
+//			state = 6;
 			new_distance_value = DistanceLinear(300, value, &radar_factory_data.cal_table_type.table[5]);
 		}
 		else
 		{
-			state = 8;
+//			state = 8;
 //			new_distance_value = 400;
 		}
 //	}
@@ -608,5 +607,6 @@ void RADAR_GetToiletCover(INT8U *output)
 
 	output[0] = state;
 }
+
 
 
