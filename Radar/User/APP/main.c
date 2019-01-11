@@ -89,9 +89,13 @@ int main(void)
 	/* Add Task */
 	SCH_Add_Task(RADAR_Test 					, 		1  , 		100  );
 
-	SCH_Add_Task(Protocol_process 				, 		2  , 		10   );//RADAR_TestTime
+//	SCH_Add_Task(Protocol_process 				, 		2  , 		5   );//RADAR_TestTime
 
 	SCH_Add_Task(Protocol_heart_beat 			, 		10 , 		8   );//Protocol_heart_beat
+
+
+
+	BSP_WatchdogInit();
 
 	SCH_Start();
 
@@ -99,8 +103,10 @@ int main(void)
 	while (1)
 	{
 		SCH_Dispatch_Tasks();
+
 		Protocol_preprocessing();
-//		Protocol_process();
+		Protocol_process();
+
 		RADAR_Process();
 	}
 

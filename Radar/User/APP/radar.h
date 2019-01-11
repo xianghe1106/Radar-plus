@@ -55,7 +55,7 @@ typedef struct
 		DISTANCE_TABLE_Type cal_table_type;
 //	}distance;
 
-	INT16U gesture_amp_point;
+	INT16U gesture_dis_point;	//distance
 	INT8U  gesture_spd_point;
 }RADAR_FACTORY_DATA_Type;
 

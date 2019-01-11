@@ -90,7 +90,7 @@ XMC_RADARSENSE2GOL_ALG_t radarsense2gol_algorithm =
  */
 XMC_RADARSENSE2GOL_POWERDOWN_t radarsense2gol_powerdown =
 {
-		.sleep_deepsleep_enable   = XMC_RADARSENSE2GOL_ENABLED, /**< sleep / deepsleep enabled */
+		.sleep_deepsleep_enable   = XMC_RADARSENSE2GOL_DISABLED, /**< sleep / deepsleep enabled */
 		.mainexec_enable          = XMC_RADARSENSE2GOL_ENABLED, /**< main exec enabled */
 		.vadc_clock_gating_enable = XMC_RADARSENSE2GOL_ENABLED  /**< vadc clock gating enabled */
 };
@@ -121,11 +121,19 @@ INT16U trough_I_buffer[SAMPLING_SIZE];*/
 
 //INT8U radar_flash_buffer[512];
 
+RADAR_TOILET_COVER_Type toilet_cover_a = TOILET_COVER_CLOSED, toilet_cover_b = TOILET_COVER_CLOSED;
+//INT16U sample_bak_buffer[BUFF_SIZE];
+
 /*
 *********************************************************************************************************
 *                                      LOCAL FUNCTION PROTOTYPES
 *********************************************************************************************************
 */
+
+void RADAR_SetToiletCoverAStatus(RADAR_TOILET_COVER_Type status);
+void RADAR_GetToiletCoverAStatus(RADAR_TOILET_COVER_Type *status);
+void RADAR_SetToiletCoverBStatus(RADAR_TOILET_COVER_Type status);
+void RADAR_GetToiletCoverBStatus(RADAR_TOILET_COVER_Type *status);
 
 void RADAR_TestTime(void);
 void radarsense2gol_result( uint32_t *fft_magnitude_array,
@@ -195,7 +203,7 @@ void RADAR_Init(void)
 		radar_factory_data.cal_table_type.table[4] = 150;		//2.5 fake
 		radar_factory_data.cal_table_type.table[5] = 120;		//3.0
 
-		radar_factory_data.gesture_amp_point = 1000;
+		radar_factory_data.gesture_dis_point = 1000;
 		radar_factory_data.gesture_spd_point = 20;	//2KM/H
 	}
 
@@ -397,14 +405,14 @@ void RADAR_UserDataInitFromDefaults(void)
 
 INT16U DistanceLinear(INT16U base_dis, INT16U samle_value, INT16U *cal_table)
 {
-	INT16U output = 0;
+	INT16U output = 250;
 
 	if(cal_table[0] == cal_table[1])
 	{
 		return output;
 	}
 
-	output = base_dis - (samle_value - cal_table[1]) / (cal_table[0] - cal_table[1]);
+	output = base_dis - (((samle_value - cal_table[1]) * 50) / (cal_table[0] - cal_table[1]));
 
 	return output;
 }
@@ -412,12 +420,14 @@ INT16U DistanceLinear(INT16U base_dis, INT16U samle_value, INT16U *cal_table)
 void RADAR_GetDistance(INT8U *output)
 {
 	INT16U value = 0;
-	INT16U buffer[2];
-	static INT16U new_distance_value = 0;
-	static INT16U cur_distance_value = 0;
-
-	static INT8U startup = 0;
-//	INT8U state = 0;
+	INT16U buffer[2], cur_speed;
+	volatile INT32U new_distance_value = 0;
+	volatile static INT32U cur_distance_value;
+	volatile static INT8U startup = 0;
+	volatile static INT16U dis_buffer[20];
+	INT16U i, size;
+	INT32U dis_sum;
+	INT8U  byte_buffer[2];
 
 	XMC_RADARSENSE2GOL_MOTION_t motion;
 
@@ -425,51 +435,92 @@ void RADAR_GetDistance(INT8U *output)
 
 	value = buffer[0] - buffer[1];
 
-//	for(i = 0; i < 5; i++)
-//	{
-		if(value > radar_factory_data.cal_table_type.table[0])
+	RADAR_GetSpeed(byte_buffer);
+	cur_speed = get16(byte_buffer);
+
+	RADAR_GetMotion(&motion);
+
+	for(i = 0; i < (sizeof(dis_buffer) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
+	{
+		dis_buffer[i] = dis_buffer[i + 1];
+	}
+
+	if((cur_speed < radar_factory_data.gesture_spd_point)
+		&& (SCH_Get_Flag(Flag_SampleFilter) == 0)
+		&& ((motion == XMC_MOTION_DETECT_APPROACHING) || (motion == XMC_MOTION_DETECT_DEPARTING)))
+	{
+		if(value >= radar_factory_data.cal_table_type.table[0])
 		{
-//			state = 1;
 			new_distance_value = 50;
 		}
 		else if(value > radar_factory_data.cal_table_type.table[1])
 		{
-//			state = 2;
-			new_distance_value = DistanceLinear(100, value, &radar_factory_data.cal_table_type.table[1]);
+			new_distance_value = DistanceLinear(100, value, &radar_factory_data.cal_table_type.table[0]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[2])
 		{
-//			state = 3;
-			new_distance_value = DistanceLinear(150, value, &radar_factory_data.cal_table_type.table[2]);
+			new_distance_value = DistanceLinear(150, value, &radar_factory_data.cal_table_type.table[1]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[3])
 		{
-//			state = 4;
-			new_distance_value = DistanceLinear(200, value, &radar_factory_data.cal_table_type.table[3]);
+			new_distance_value = DistanceLinear(200, value, &radar_factory_data.cal_table_type.table[2]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[4])
 		{
-//			state = 5;
-			new_distance_value = DistanceLinear(250, value, &radar_factory_data.cal_table_type.table[4]);
+			new_distance_value = DistanceLinear(250, value, &radar_factory_data.cal_table_type.table[3]);
 		}
 		else if(value > radar_factory_data.cal_table_type.table[5])
 		{
-//			state = 6;
-			new_distance_value = DistanceLinear(300, value, &radar_factory_data.cal_table_type.table[5]);
+			new_distance_value = DistanceLinear(300, value, &radar_factory_data.cal_table_type.table[4]);
 		}
 		else
 		{
-//			state = 8;
-//			new_distance_value = 400;
+			new_distance_value = 300;
 		}
-//	}
+
+		dis_buffer[sizeof(dis_buffer)/2 - 1] = new_distance_value;
+	}
+	else
+	{
+		if(SCH_Get_Flag(Flag_SampleFilter) == 0)
+		{
+			SCH_Add_Flag(Flag_SampleFilter, SCH_FLAG_300MS);
+		}
+
+		size = (sizeof(dis_buffer) / 2) / 3;
+		for(dis_sum = 0, i = 0; i < size; i++)
+		{
+			dis_sum += dis_buffer[i];
+		}
+
+		dis_sum = dis_sum / size;
+
+		for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+		{
+			dis_buffer[i] = dis_sum;
+		}
+	}
 
 	if(startup == 0)
 	{
 		startup = 1;
 
 		cur_distance_value = new_distance_value;
+
+		for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+		{
+			dis_buffer[i] = cur_distance_value;
+		}
 	}
+
+
+	dis_sum = 0;
+	for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+	{
+		dis_sum += dis_buffer[i];
+	}
+
+	new_distance_value = dis_sum / (sizeof(dis_buffer) / 2);
 
 	RADAR_GetMotion(&motion);
 
@@ -490,13 +541,6 @@ void RADAR_GetDistance(INT8U *output)
 
 	output[0] = WORD_HIGH(cur_distance_value);
 	output[1] = WORD_LOW(cur_distance_value);
-
-//	output[0] = WORD_HIGH(state);
-//	output[1] = WORD_LOW(state);
-
-
-//	output[0] = 0;
-//	output[1] = 0;
 }
 
 void RADAR_GetSpeed(INT8U *output)
@@ -539,73 +583,101 @@ void RADAR_GetMotion(INT8U *output)
 void RADAR_GetGesture(INT8U *output)
 {
 	INT8U buffer[2];
-	INT16U cur_distance, cur_speed;
-	static RADAR_GESTURE_Type state = GESTURE_UNDEFINED;
-//	static INT8U startup = 0;
-//	static INT16U history_amplitude;
-
-//	RADAR_GetAmplitude(buffer);
-//	cur_amplitude = (buffer[0] << 8) + buffer[1];
-
-//	if(startup == 0)
-//	{
-//		startup = 1;
-
-//		history_amplitude = cur_amplitude;
-///	}
+	INT16U cur_speed;
+//	static RADAR_GESTURE_Type state = GESTURE_UNDEFINED;
+	RADAR_TOILET_COVER_Type cover_status;
 
 	RADAR_GetSpeed(buffer);
 	cur_speed = get16(buffer);
 
-	RADAR_GetDistance(buffer);
-	cur_distance = get16(buffer);
+//	RADAR_GetDistance(buffer);
+//	cur_distance = get16(buffer);
 
-//	if((abs(cur_amplitude - history_amplitude) > radar_factory_data.gesture_amp_point)
-//	&& (cur_speed < radar_factory_data.gesture_spd_point))
+	RADAR_GetToiletCoverAStatus(&cover_status);
 
 	if((cur_speed > radar_factory_data.gesture_spd_point)
-	&& (cur_distance < radar_factory_data.gesture_amp_point))
+	&& (cover_status == TOILET_COVER_OPENED))
 	{
-		if(SCH_Get_Flag(Flag_GestureDelay) == 0)
-		{
-			SCH_Add_Flag(Flag_GestureDelay, SCH_FLAG_1000MS);
+//		state = GESTURE_DETECTED;
 
-			if(state == GESTURE_DETECTED)
-			{
-				state = NO_GESTURE_DETECTED;
-			}
-			else
-			{
-				state = GESTURE_DETECTED;
-			}
-		}
+		RADAR_SetToiletCoverBStatus(TOILET_COVER_OPENED);
 	}
 
-	if(cur_distance >150)
-	{
-		state = NO_GESTURE_DETECTED;
-	}
+//	if(cur_distance >150)
+//	{
+//		state = NO_GESTURE_DETECTED;
+//	}
 
-
-
-//	history_amplitude = cur_amplitude;
-
-	output[0] = state;
+	RADAR_GetToiletCoverBStatus(output);
 }
 
 void RADAR_GetToiletCover(INT8U *output)
 {
 	INT8U  buffer[5];
-	RADAR_TOILET_COVER_Type state = TOILET_COVER_CLOSED;
+	RADAR_TOILET_COVER_Type cover_b_state;
 
 	RADAR_GetDistance(buffer);
 
 	if(get16(buffer) < 150)
 	{
-		state = TOILET_COVER_OPENED;
+		SCH_Add_Flag(Flag_CoverADelay, SCH_FLAG_10000MS);
+
+//		state = TOILET_COVER_OPENED;
+
+		RADAR_SetToiletCoverAStatus(TOILET_COVER_OPENED);
+	}
+	else
+	{
+		if(SCH_Get_Flag(Flag_CoverADelay) == 0)
+		{
+			RADAR_GetToiletCoverBStatus(&cover_b_state);
+			if(cover_b_state == TOILET_COVER_OPENED)
+			{
+				RADAR_SetToiletCoverBStatus(TOILET_COVER_CLOSED);
+
+				if(SCH_Get_Flag(Flag_CoverBDelay) == 0)
+				{
+					SCH_Add_Flag(Flag_CoverBDelay, SCH_FLAG_1500MS);	//1.5s delay
+				}
+			}
+
+			if(SCH_Get_Flag(Flag_CoverBDelay) == 0)
+			{
+//				state = TOILET_COVER_CLOSED;
+
+				RADAR_SetToiletCoverAStatus(TOILET_COVER_CLOSED);
+			}
+		}
 	}
 
-	output[0] = state;
+
+
+//	output[0] = state;
+
+	RADAR_GetToiletCoverAStatus(output);
+}
+
+
+//API
+
+void RADAR_SetToiletCoverAStatus(RADAR_TOILET_COVER_Type status)
+{
+	toilet_cover_a = status;
+}
+
+void RADAR_GetToiletCoverAStatus(RADAR_TOILET_COVER_Type *status)
+{
+	*status = toilet_cover_a;
+}
+
+void RADAR_SetToiletCoverBStatus(RADAR_TOILET_COVER_Type status)
+{
+	toilet_cover_b = status;
+}
+
+void RADAR_GetToiletCoverBStatus(RADAR_TOILET_COVER_Type *status)
+{
+	*status = toilet_cover_b;
 }
 
 

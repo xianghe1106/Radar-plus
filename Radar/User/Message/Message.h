@@ -73,6 +73,9 @@ typedef enum
 {
 	Flag_Null 					= 0x00,
 	Flag_GestureDelay 			= 0x01,
+	Flag_CoverADelay			= 0x02,
+	Flag_CoverBDelay			= 0x03,
+	Flag_SampleFilter			= 0x04,
 
 }SCH_FLAG_FLAG;
 

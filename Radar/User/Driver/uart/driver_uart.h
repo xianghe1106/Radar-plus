@@ -49,7 +49,7 @@
 */
 
 //#define UART_BAUDRATE							256000UL
-#define UART_BAUDRATE							19200UL
+#define UART_BAUDRATE							38400UL
 
 
 /*

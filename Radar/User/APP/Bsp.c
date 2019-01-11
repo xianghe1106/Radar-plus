@@ -26,6 +26,7 @@
 #include "driver.h"
 #include "radar.h"
 #include "core_cm0.h"
+//#include <xmc_wdt.h>
 
 /*
 *********************************************************************************************************
@@ -137,14 +138,29 @@ void BSP_IntEn(void)
     CPU_IntEn();
 }
 
+/*
+XMC_WDT_CONFIG_t WATCHDOG_0_Config =
+{
+  .window_upper_bound   = 0x28000U,  Service Window UpperBound time
+  .window_lower_bound   = 0x0U,  Service Window LowerBound time
+  .prewarn_mode         = false,  WatchDog Timer Mode
+  .run_in_debug_mode    = 0U,  WatchDog Timer status during Debug Mode
+  .service_pulse_width  = 0U  Service Indication Pulse Width
+};
+*/
+
+
+
 void BSP_WatchdogInit(void)
 {
+//	XMC_WDT_Init(&WATCHDOG_0_Config);
 
+//	XMC_WDT_Start();
 }
 
 void BSP_FeedDog(void)
 {
-
+//	XMC_WDT_Service();
 }
 
 

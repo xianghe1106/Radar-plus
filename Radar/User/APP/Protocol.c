@@ -579,8 +579,8 @@ static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.gesture_amp_point);
-	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.gesture_amp_point);
+	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.gesture_dis_point);
+	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.gesture_dis_point);
 
 	ProtocolMsg.Output[2] = radar_factory_data.gesture_spd_point;
 }
@@ -708,12 +708,12 @@ static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	para_amplitude = (ProtocolMsg.Para[0] << 8) + ProtocolMsg.Para[1];
 	para_speed = ProtocolMsg.Para[2];
 
-	radar_factory_data_bak.gesture_amp_point = para_amplitude;
+	radar_factory_data_bak.gesture_dis_point = para_amplitude;
 	radar_factory_data_bak.gesture_spd_point = para_speed;
 
 	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
 	{
-		radar_factory_data.gesture_amp_point = para_amplitude;
+		radar_factory_data.gesture_dis_point = para_amplitude;
 		radar_factory_data.gesture_spd_point = para_speed;
 	}
 	else

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<Project MotherSystem_Version="" Name="Radar" Path="E:\Project Evaluation\infineon\FW_test\Radar">
+<Project MotherSystem_Version="" Name="Radar" Path="C:\SPB_Data\git\repository\Radar">
     <COMPILER>
         <Name>ARM_GCC_HOME</Name>
         <Version/>

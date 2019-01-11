@@ -3,6 +3,13 @@
  *
  *  Created on: Dec 11, 2018
  *      Author: xianghe
+ *
+ *      V1.0.3		2019-01-07		XH				- fix the toilet cover A detection.
+ *      											- fix the distance detection, add buffer to filter the abnormal distance data
+ *      											caused by abnormal signal.
+ *      											- toilet cover B will closed while distance beyond 1.5m and the time beyond 10s,
+ *      											and then toilet cover A will closed.
+ *      											- fix DistanceLinear().
  */
 
 #ifndef USER_APP_PROTOCOL_H_
@@ -91,7 +98,7 @@ typedef struct
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							2
+#define BUILD_VERSION							3
 
 #define START_BYTE								0x7E
 #define STOP_BYTE								0x7E
