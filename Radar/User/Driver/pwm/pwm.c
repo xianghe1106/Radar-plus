@@ -1,16 +1,12 @@
 /*
-*********************************************************************************************************
-*                                                SCH_Core
-*
-* File    : SCH_Core.c
-* By      : XH
-* Version : V1.4
-*
-* Comments:
-* ---------------
-*     
-*********************************************************************************************************
-*/
+ * pwm.c
+ *
+ *  Created on: Jan 14, 2019
+ *      Author: xianghe
+ */
+
+
+
 
 /*
 *********************************************************************************************************
@@ -18,8 +14,9 @@
 *********************************************************************************************************
 */
 
-#include "Bsp.h"
-#include "SCH_Core.h"
+#include <gpio/driver_gpio.h>
+#include "pwm.h"
+#include "radar.h"
 
 /*
 *********************************************************************************************************
@@ -59,7 +56,7 @@
 *********************************************************************************************************
 */
 
-
+PWM_SRARUS_Type PWM_STATE;
 
 /*
 *********************************************************************************************************
@@ -67,101 +64,89 @@
 *********************************************************************************************************
 */
 
-/*------------------------------------------------------------------*-
+static void GPIOInit(void);
+static void ParaInit(void);
 
-  SCH_Init()
+/*
+*********************************************************************************************************
+*                                     LOCAL CONFIGURATION ERRORS
+*********************************************************************************************************
+*/
 
-  Initialization Scheduler.
 
-  Include:
-  	SCH_Task_Init()
-	SCH_Flag_Init()
-	SCH_Msg_Init()
-	SCH_RTC_Init(0,0,0)
-	BSP_SysTickInit()
-
--*------------------------------------------------------------------*/
-void SCH_Init(void)
+const DIGITAL_IO_type PWM_PORT =
 {
-	SCH_Task_Init();
-	
-	SCH_Flag_Init();
+  .gpio_port = XMC_GPIO_PORT0,
+  .gpio_pin = 8U,
+  .gpio_config = {
+    .mode = XMC_GPIO_MODE_OUTPUT_PUSH_PULL,
+    .output_level = XMC_GPIO_OUTPUT_LEVEL_LOW,
 
-	SCH_RTC_Init(0,0,0);
+  },
+  .hwctrl = XMC_GPIO_HWCTRL_DISABLED
+};
 
-	BSP_SysTickInit();
 
-	p_APP_Task_Update = APP_Task_Update;
+void PWM_Init(void)
+{
+	GPIOInit();
+	ParaInit();
 }
 
-/*------------------------------------------------------------------*-
-
-  SCH_Start()
-
-  Starts the scheduler, by enabling interrupts.
-
-  NOTE: Usually called after all regular tasks are added,
-  to keep the tasks synchronised.
-
-  NOTE: ONLY THE SCHEDULER INTERRUPT SHOULD BE ENABLED!!! 
-
--*------------------------------------------------------------------*/
-void SCH_Start(void) 
+static void GPIOInit(void)
 {
-	BSP_IntEn();
+	DIGITAL_GPIO_Init(&PWM_PORT);
+
+	DIGITAL_GPIO_SetOutputLow(&PWM_PORT);
 }
-/*------------------------------------------------------------------*-
 
-  SysTick_Handler()
-
-
-
--*------------------------------------------------------------------*/
-void SysTick_Handler(void)
+static void ParaInit(void)
 {
-//	CPU_SR_ALLOC();
+	PWM_STATE = PWM_LOW;
+}
 
-//	SCH_CRITICAL_ENTER();
+void PWM_Update(void)
+{
+	PWM_SRARUS_Type state;
 
-	SCH_Task_Update();
-	
-	SCH_Flag_Update();
+/*	INT8U  buffer[2];
+	INT16U cur_distance;
 
-	SCH_RTC_Update();
-	
-	if(p_APP_Task_Update != NULL)
+	RADAR_GetDistance(buffer);
+	cur_distance = get16(buffer);
+
+	if(cur_distance <= 150)
 	{
-		p_APP_Task_Update();
+		PWM_STATE = PWM_ENABLE;
 	}
+	else
+	{
+		PWM_STATE = PWM_LOW;
+	}*/
 
-	
-//	APP_Time_Update();
+	PWM_GetState(&state);
 
-//	SCH_CRITICAL_EXIT();
+	if(state == PWM_LOW)
+	{
+		DIGITAL_GPIO_SetOutputLow(&PWM_PORT);
+	}
+	else //PWM_ENABLE
+	{
+		DIGITAL_GPIO_ToggleOutput(&PWM_PORT);
+	}
 }
 
-/*void SysTick_Update(void)
+//API
+
+void PWM_SetState(PWM_SRARUS_Type state)
 {
-//	CPU_SR_ALLOC();
+	PWM_STATE = state;
+}
 
-//	SCH_CRITICAL_ENTER();
-
-//	TIMER_ClearEvent(&TIMER_1);
-
-	SCH_Task_Update();
-
-	SCH_Flag_Update();
-
-	SCH_RTC_Update();
-
-//	APP_Task_Update();
-
-//	APP_Time_Update();
-
-//	SCH_CRITICAL_EXIT();
-}*/
-
-
+void PWM_GetState(PWM_SRARUS_Type *state)
+{
+	*state = PWM_STATE;
+}
 
 
 

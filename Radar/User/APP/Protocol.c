@@ -206,7 +206,7 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	{0xA0 	, GetFirmwareVersion					,2 },
 	{0xA1	, GetDeviceAddress						,1 },
 	{0xA2	, GetNotifyState						,1 },
-	{0xA3	, GetDistanceOffset						,1 },
+	{0xA3	, GetDistanceOffset						,8 },
 	{0xA4	, GetSummaryInfo						,11},
 	{0xA5	, GetAmplitudeOffset					,2 },
 	{0xA6	, GetGestureTripPoint					,3 },
@@ -568,7 +568,12 @@ static void GetNotifyState(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	ProtocolMsg.Output[0] = radar_factory_data.distance_offset[0];
+	INT8U i;
+
+	for(i = 0; i < 8; i++)
+	{
+		ProtocolMsg.Output[i] = radar_factory_data.distance_offset[i];
+	}
 }
 
 static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
@@ -662,13 +667,23 @@ static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg)
 static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+	INT8U i;
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
-	radar_factory_data_bak.distance_offset[0] = (INT8S)ProtocolMsg.Para[0];
+
+	for(i = 0; i < 8; i++)
+	{
+		radar_factory_data_bak.distance_offset[i] = (INT8S)ProtocolMsg.Para[i];
+	}
 
 	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
 	{
-		radar_factory_data.distance_offset[0] = (INT8S)ProtocolMsg.Para[0];
+//		radar_factory_data.distance_offset[0] = (INT8S)ProtocolMsg.Para[0];
+
+		for(i = 0; i < 8; i++)
+		{
+			radar_factory_data.distance_offset[i] = (INT8S)ProtocolMsg.Para[i];
+		}
 	}
 	else
 	{

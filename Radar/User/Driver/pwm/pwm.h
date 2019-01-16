@@ -1,5 +1,14 @@
-#ifndef _SCH_CORE_H
-#define _SCH_CORE_H 
+/*
+ * pwm.h
+ *
+ *  Created on: Jan 14, 2019
+ *      Author: xianghe
+ */
+
+#ifndef USER_DRIVER_PWM_PWM_H_
+#define USER_DRIVER_PWM_PWM_H_
+
+
 
 /*
 *********************************************************************************************************
@@ -7,19 +16,7 @@
 *********************************************************************************************************
 */
 
-#include "XMC1300.h"
-#include "cpu.h"
-//#include "bsp.h"
-#include "stddef.h"
 
-#include "SCH_Task.h"
-#include "SCH_Flag.h"
-#include "SCH_RTC.h"
-
-#include "RTAPP.h"
-
-
-//#include "RTAPP.h"
 
 /*
 *********************************************************************************************************
@@ -35,7 +32,13 @@
 *********************************************************************************************************
 */
 
-void (*p_APP_Task_Update)(void);
+typedef enum
+{
+	PWM_NULL 	= 0,
+	PWM_ENABLE 	= 1,
+	PWM_LOW 	= 2,
+	PWM_HIGH 	= 3,
+} PWM_SRARUS_Type;
 
 /*
 *********************************************************************************************************
@@ -43,6 +46,7 @@ void (*p_APP_Task_Update)(void);
 *********************************************************************************************************
 */
 
+extern PWM_SRARUS_Type PWM_STATE;
 
 
 /*
@@ -51,11 +55,7 @@ void (*p_APP_Task_Update)(void);
 *********************************************************************************************************
 */
 
-#define SCH_CRITICAL_ENTER()			CPU_CRITICAL_ENTER() 
-#define SCH_CRITICAL_EXIT()				CPU_CRITICAL_EXIT()
 
-#define SCH_CFG_TICK_RATE_HZ       		100u               // Tick rate in Hertz (10 to 1000 Hz) 
-#define SCH_TICK_TIME_MS				(1000 / SCH_CFG_TICK_RATE_HZ)
 
 
 /*
@@ -64,12 +64,17 @@ void (*p_APP_Task_Update)(void);
 *********************************************************************************************************
 */
 
-void SCH_Init(void);
+void PWM_Init(void);
+void PWM_Update(void);
 
-void SCH_Start(void);
+void PWM_SetState(PWM_SRARUS_Type state);
+void PWM_GetState(PWM_SRARUS_Type *state);
 
-void SysTick_Update(void);
 
+/*
+*********************************************************************************************************
+*                                               END
+*********************************************************************************************************
+*/
 
-#endif 
-
+#endif /* USER_DRIVER_PWM_PWM_H_ */

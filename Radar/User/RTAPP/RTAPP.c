@@ -1,16 +1,12 @@
 /*
-*********************************************************************************************************
-*                                                SCH_Core
-*
-* File    : SCH_Core.c
-* By      : XH
-* Version : V1.4
-*
-* Comments:
-* ---------------
-*     
-*********************************************************************************************************
-*/
+ * RTAPP.c
+ *
+ *  Created on: Jan 14, 2019
+ *      Author: xianghe
+ */
+
+
+
 
 /*
 *********************************************************************************************************
@@ -18,8 +14,9 @@
 *********************************************************************************************************
 */
 
-#include "Bsp.h"
-#include "SCH_Core.h"
+#include "radar.h"
+
+#include "pwm.h"
 
 /*
 *********************************************************************************************************
@@ -67,99 +64,22 @@
 *********************************************************************************************************
 */
 
-/*------------------------------------------------------------------*-
 
-  SCH_Init()
 
-  Initialization Scheduler.
+/*
+*********************************************************************************************************
+*                                     LOCAL CONFIGURATION ERRORS
+*********************************************************************************************************
+*/
 
-  Include:
-  	SCH_Task_Init()
-	SCH_Flag_Init()
-	SCH_Msg_Init()
-	SCH_RTC_Init(0,0,0)
-	BSP_SysTickInit()
 
--*------------------------------------------------------------------*/
-void SCH_Init(void)
+
+void APP_Task_Update(void)
 {
-	SCH_Task_Init();
-	
-	SCH_Flag_Init();
-
-	SCH_RTC_Init(0,0,0);
-
-	BSP_SysTickInit();
-
-	p_APP_Task_Update = APP_Task_Update;
+	PWM_Update();
 }
 
-/*------------------------------------------------------------------*-
 
-  SCH_Start()
-
-  Starts the scheduler, by enabling interrupts.
-
-  NOTE: Usually called after all regular tasks are added,
-  to keep the tasks synchronised.
-
-  NOTE: ONLY THE SCHEDULER INTERRUPT SHOULD BE ENABLED!!! 
-
--*------------------------------------------------------------------*/
-void SCH_Start(void) 
-{
-	BSP_IntEn();
-}
-/*------------------------------------------------------------------*-
-
-  SysTick_Handler()
-
-
-
--*------------------------------------------------------------------*/
-void SysTick_Handler(void)
-{
-//	CPU_SR_ALLOC();
-
-//	SCH_CRITICAL_ENTER();
-
-	SCH_Task_Update();
-	
-	SCH_Flag_Update();
-
-	SCH_RTC_Update();
-	
-	if(p_APP_Task_Update != NULL)
-	{
-		p_APP_Task_Update();
-	}
-
-	
-//	APP_Time_Update();
-
-//	SCH_CRITICAL_EXIT();
-}
-
-/*void SysTick_Update(void)
-{
-//	CPU_SR_ALLOC();
-
-//	SCH_CRITICAL_ENTER();
-
-//	TIMER_ClearEvent(&TIMER_1);
-
-	SCH_Task_Update();
-
-	SCH_Flag_Update();
-
-	SCH_RTC_Update();
-
-//	APP_Task_Update();
-
-//	APP_Time_Update();
-
-//	SCH_CRITICAL_EXIT();
-}*/
 
 
 

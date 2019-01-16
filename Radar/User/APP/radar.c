@@ -21,6 +21,8 @@
 
 #include "Message.h"
 
+#include "pwm.h"
+
 /*
 *********************************************************************************************************
 *                                            LOCAL DEFINES
@@ -417,14 +419,74 @@ INT16U DistanceLinear(INT16U base_dis, INT16U samle_value, INT16U *cal_table)
 	return output;
 }
 
+/*INT16U DistanceCalOffset(INT16U cur_amp)
+{
+	INT16U output = 0;
+	INT16U base_distance;
+
+	if(cur_amp >= radar_factory_data.cal_table_type.table[0])
+	{
+		output = 50;
+
+		base_distance = 10 * radar_factory_data.cal_table_type.minDistance;
+	}
+	else if(cur_amp > radar_factory_data.cal_table_type.table[1])
+	{
+		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + DISTANCE_STEP;
+
+		output = DistanceLinear(100, cur_amp, &radar_factory_data.cal_table_type.table[0]);//100
+
+		output += radar_factory_data.distance_offset[0];
+	}
+	else if(cur_amp > radar_factory_data.cal_table_type.table[2])
+	{
+		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 2 * DISTANCE_STEP;
+
+		output = DistanceLinear(150, cur_amp, &radar_factory_data.cal_table_type.table[1]);//150
+
+		output += radar_factory_data.distance_offset[1];
+	}
+	else if(cur_amp > radar_factory_data.cal_table_type.table[3])
+	{
+		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 3 * DISTANCE_STEP;
+
+		output = DistanceLinear(base_distance, cur_amp, &radar_factory_data.cal_table_type.table[2]);//200
+
+		output += radar_factory_data.distance_offset[2];
+	}
+	else if(cur_amp > radar_factory_data.cal_table_type.table[4])
+	{
+		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 4 * DISTANCE_STEP;
+
+		output = DistanceLinear(base_distance, cur_amp, &radar_factory_data.cal_table_type.table[3]);//250
+
+		output += radar_factory_data.distance_offset[3];
+	}
+	else if(cur_amp > radar_factory_data.cal_table_type.table[5])
+	{
+		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 5 * DISTANCE_STEP;
+
+		output = DistanceLinear(base_distance, cur_amp, &radar_factory_data.cal_table_type.table[4]);//300
+
+		output += radar_factory_data.distance_offset[4];
+	}
+	else
+	{
+		output = 300;
+	}
+
+	return output;
+}*/
+
+INT16U dis_buffer[20] = {160};
 void RADAR_GetDistance(INT8U *output)
 {
 	INT16U value = 0;
 	INT16U buffer[2], cur_speed;
-	volatile INT32U new_distance_value = 0;
+	volatile INT16U new_distance_value = 0;
 	volatile static INT32U cur_distance_value;
 	volatile static INT8U startup = 0;
-	volatile static INT16U dis_buffer[20];
+//	volatile static INT16U dis_buffer[20];
 	INT16U i, size;
 	INT32U dis_sum;
 	INT8U  byte_buffer[2];
@@ -456,27 +518,39 @@ void RADAR_GetDistance(INT8U *output)
 		else if(value > radar_factory_data.cal_table_type.table[1])
 		{
 			new_distance_value = DistanceLinear(100, value, &radar_factory_data.cal_table_type.table[0]);
+
+			new_distance_value += radar_factory_data.distance_offset[0];
 		}
 		else if(value > radar_factory_data.cal_table_type.table[2])
 		{
 			new_distance_value = DistanceLinear(150, value, &radar_factory_data.cal_table_type.table[1]);
+
+			new_distance_value += radar_factory_data.distance_offset[1];
 		}
 		else if(value > radar_factory_data.cal_table_type.table[3])
 		{
 			new_distance_value = DistanceLinear(200, value, &radar_factory_data.cal_table_type.table[2]);
+
+			new_distance_value += radar_factory_data.distance_offset[2];
 		}
 		else if(value > radar_factory_data.cal_table_type.table[4])
 		{
 			new_distance_value = DistanceLinear(250, value, &radar_factory_data.cal_table_type.table[3]);
+
+			new_distance_value += radar_factory_data.distance_offset[3];
 		}
 		else if(value > radar_factory_data.cal_table_type.table[5])
 		{
 			new_distance_value = DistanceLinear(300, value, &radar_factory_data.cal_table_type.table[4]);
+
+			new_distance_value += radar_factory_data.distance_offset[4];
 		}
 		else
 		{
 			new_distance_value = 300;
 		}
+
+//		new_distance_value = DistanceCalOffset(value);
 
 		dis_buffer[sizeof(dis_buffer)/2 - 1] = new_distance_value;
 	}
@@ -507,9 +581,21 @@ void RADAR_GetDistance(INT8U *output)
 
 		cur_distance_value = new_distance_value;
 
-		for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+		if(new_distance_value > 0)
 		{
-			dis_buffer[i] = cur_distance_value;
+			for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+			{
+				dis_buffer[i] = cur_distance_value;
+			}
+		}
+		else
+		{
+			for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+			{
+				dis_buffer[i] = 160;//default
+			}
+
+			cur_distance_value = dis_buffer[0];
 		}
 	}
 
@@ -537,6 +623,15 @@ void RADAR_GetDistance(INT8U *output)
 		{
 			cur_distance_value = new_distance_value;
 		}
+	}
+
+	if(cur_distance_value <= 150)
+	{
+		PWM_SetState(PWM_ENABLE);
+	}
+	else
+	{
+		PWM_SetState(PWM_LOW);
 	}
 
 	output[0] = WORD_HIGH(cur_distance_value);

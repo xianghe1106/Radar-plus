@@ -10,6 +10,20 @@
  *      											- toilet cover B will closed while distance beyond 1.5m and the time beyond 10s,
  *      											and then toilet cover A will closed.
  *      											- fix DistanceLinear().
+ *
+ *      V1.0.4		2019-01-14		XH				- add distance offset.
+ *      												1. protocol.c
+ *      												  a. SetDistanceOffset updated.
+ *      												  b. GetDistanceOffset updated.
+ *      												2. radar.c
+ *														  a. RADAR_GetDistance updated.
+ *														3. pwm.c
+ *														  a. add pwm.c and pwm.h files.
+ *														4. RTAPP
+ *														  a. add RTAPP.c and RTAPP.h files.
+ *														  b. SCH_Core.c and SCH_Core.h updated, add p_APP_Task_Update.
+ *
+ *
  */
 
 #ifndef USER_APP_PROTOCOL_H_
@@ -98,7 +112,7 @@ typedef struct
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							3
+#define BUILD_VERSION							4
 
 #define START_BYTE								0x7E
 #define STOP_BYTE								0x7E

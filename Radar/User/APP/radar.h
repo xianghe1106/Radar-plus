@@ -103,6 +103,8 @@ extern RADAR_USER_DATA_Type		radar_user_data;
 
 #define SAMPLING_SIZE							2
 
+#define DISTANCE_STEP							50
+
 
 /*
 *********************************************************************************************************
