@@ -23,6 +23,12 @@
  *														  a. add RTAPP.c and RTAPP.h files.
  *														  b. SCH_Core.c and SCH_Core.h updated, add p_APP_Task_Update.
  *
+ *      V1.0.5		2019-01-17		XH
+ *      											- ARM-GCC optimization level changed from Os to O1。
+ *													- GetFirmwareVersion, FW version info changed from 2 bytes to 3 bytes.
+ *													- add Radar_DistanceUpdate function to calculate a new distance parameter,
+ *													calculate the new distance parameter by formula.
+ *
  *
  */
 
@@ -112,7 +118,7 @@ typedef struct
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							4
+#define BUILD_VERSION							5
 
 #define START_BYTE								0x7E
 #define STOP_BYTE								0x7E

@@ -144,6 +144,7 @@ static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 
 
 static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg);
@@ -153,13 +154,15 @@ static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 
 
 static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg);
-
+static void SetAmplitudeCalibrationMode(ProtocolMsg_TypeDef ProtocolMsg);
 
 static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetAmplitude(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetAmplitudeCalibrationMode(ProtocolMsg_TypeDef ProtocolMsg);
 
 /*
 *********************************************************************************************************
@@ -197,19 +200,23 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	{0x83 	, SetAmplitudeOffset					,0 },
 	{0x84 	, SetGestureTripPoint					,0 },
 
+	{0x86 	, SetDistanceTripPoint					,0 },
+
 
 	/*---------------------------------------------------
 	--
 	-- Internal get command: 0xA0 to 0xDF
 	--
 	----------------------------------------------------*/
-	{0xA0 	, GetFirmwareVersion					,2 },
+	{0xA0 	, GetFirmwareVersion					,3 },
 	{0xA1	, GetDeviceAddress						,1 },
 	{0xA2	, GetNotifyState						,1 },
 	{0xA3	, GetDistanceOffset						,8 },
 	{0xA4	, GetSummaryInfo						,11},
 	{0xA5	, GetAmplitudeOffset					,2 },
 	{0xA6	, GetGestureTripPoint					,3 },
+
+	{0xA7 	, GetDistanceTripPoint					,2 },
 
 
 	/*---------------------------------------------------
@@ -218,10 +225,12 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	--
 	----------------------------------------------------*/
 	{0xD0 	, LoadCalibrationData					,0 },
+	{0xD1 	, SetAmplitudeCalibrationMode			,0 },
 
 
 	{0xE0 	, GetCalibrationData					,0 },
 	{0xE1 	, GetAmplitude							,2 },
+	{0xE2 	, GetAmplitudeCalibrationMode			,1 },
 
 
 	{0xFFFF , NULL									,0 }
@@ -554,6 +563,7 @@ static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	ProtocolMsg.Output[0] = MAJOR_VERSION;
 	ProtocolMsg.Output[1] = MINOR_VERSION;
+	ProtocolMsg.Output[2] = BUILD_VERSION;
 }
 
 static void GetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg)
@@ -590,6 +600,11 @@ static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	ProtocolMsg.Output[2] = radar_factory_data.gesture_spd_point;
 }
 
+static void GetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	ProtocolMsg.Output[0] = radar_factory_data.distance_point.step;
+	ProtocolMsg.Output[1] = radar_factory_data.distance_point.speed;
+}
 
 static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg)
 {
@@ -738,6 +753,28 @@ static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	}
 }
 
+static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+//	DISTANCE_TRIP_POINT_Type dis_point;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+	radar_factory_data_bak.distance_point.step = ProtocolMsg.Para[0];
+	radar_factory_data_bak.distance_point.speed = ProtocolMsg.Para[1];
+
+	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	{
+		radar_factory_data.distance_point.step = ProtocolMsg.Para[0];
+		radar_factory_data.distance_point.speed = ProtocolMsg.Para[1];
+	}
+	else
+	{
+		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		return;
+	}
+}
+
 
 static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 {
@@ -771,6 +808,23 @@ static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 	}
 }
 
+static void SetAmplitudeCalibrationMode(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	if((ProtocolMsg.Para[0] != CALIBRATION_MODE)
+	&& (ProtocolMsg.Para[0] != FREE_MODE))
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_PARAMETER;
+		return;
+	}
+
+	RADAR_SetCalibrationMode(ProtocolMsg.Para[0]);
+
+	if(ProtocolMsg.Para[0] == FREE_MODE)
+	{
+		RADAR_SetAmplitudeCalValue(0);
+	}
+}
+
 static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	INT8U size, i;
@@ -794,10 +848,15 @@ static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetAmplitude(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	RADAR_GetAmplitude(ProtocolMsg.Output);
+//	RADAR_GetAmplitude(ProtocolMsg.Output);
+
+	RADAR_GetAmplitudeCalValue(ProtocolMsg.Output);
 }
 
-
+static void GetAmplitudeCalibrationMode(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_GetCalibrationMode(ProtocolMsg.Output);
+}
 
 
 

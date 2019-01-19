@@ -87,7 +87,7 @@ int main(void)
 	SCH_Init();
 
 	/* Add Task */
-	SCH_Add_Task(RADAR_Test 					, 		1  , 		100  );
+//	SCH_Add_Task(RADAR_Test 					, 		1  , 		100  );
 
 //	SCH_Add_Task(Protocol_process 				, 		2  , 		5   );//RADAR_TestTime
 
