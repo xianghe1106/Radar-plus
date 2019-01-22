@@ -22,6 +22,7 @@
 #include "Message.h"
 
 #include "pwm.h"
+#include "Protocol.h"
 
 /*
 *********************************************************************************************************
@@ -112,19 +113,8 @@ float g_max_velocity = MOTION_MAX_VELOCITY; 				 /**< max velocity to detect mot
 bool g_start = true;										 /**< control for execution of doppler algorithm */
 bool g_uart_start = UART_RAW_DATA;							 /**< control for execution of UART feature to transmit raw IQ from ADC */
 
-/*QUEUE16_Type crest_I_queue, *p_crest_I_queue = &crest_I_queue;
-QUEUE16_Type trough_I_queue, *p_trough_I_queue = &trough_I_queue;
-
-INT16U crest_I_buffer[SAMPLING_SIZE];
-INT16U trough_I_buffer[SAMPLING_SIZE];*/
-
-//TABLE_Type DistanceTable;
-//INT8U para_buffer[100];
-
-//INT8U radar_flash_buffer[512];
 
 RADAR_TOILET_COVER_Type toilet_cover_a = TOILET_COVER_CLOSED, toilet_cover_b = TOILET_COVER_CLOSED;
-//INT16U sample_bak_buffer[BUFF_SIZE];
 
 RADAR_CALIBRATION_MODE_Type RADAR_CALIBRATION_MODE = FREE_MODE;
 INT16U AMPLITUDE_CAL_VALUE = 0;
@@ -132,6 +122,8 @@ INT16U AMPLITUDE_CAL_VALUE = 0;
 INT16U RADAR_DISTANCE_BUFFER[DISTANCE_BUFFER_SIZE] = {160};
 INT16U CUR_AMPLITUDE_VALUE = 0;
 INT16U CUR_DISTANCE_VALUE = 0;
+
+Diatance_Type dis_depart, dis_approach;
 
 /*
 *********************************************************************************************************
@@ -154,17 +146,19 @@ void radarsense2gol_result( uint32_t *fft_magnitude_array,
 		uint32_t max_frq_mag,
 		uint32_t max_frq_index);
 
-void Radar_SearchMaxMinSamplingData(INT16U *input, INT16U size, INT16U *output);
+//void Radar_SearchMaxMinSamplingData(INT16U *input, INT16U size, INT16U *output);
+//INT16U Distance_CalMaxAmplitude(void);
 
 void Radar_DistanceUpdate(void);
+void Radar_MotionUpdate(XMC_RADARSENSE2GOL_MOTION_t motion);
+void Radar_PWMStateUpdate(void);
+void Radar_ToiletCoverUpdate(void);
+
 
 
 void RADAR_Test(void)
 {
 	DIGITAL_GPIO_ToggleOutput(&LED_BLUE);
-//	DIGITAL_GPIO_SetOutputLow(&LED_BLUE);
-//	DIGITAL_GPIO_ToggleOutput(&LED_ORANGE);
-//	DIGITAL_GPIO_ToggleOutput(&LED_BLUE);
 }
 
 //INT8U flash_bu[10];
@@ -216,12 +210,20 @@ void RADAR_Init(void)
 
 		radar_factory_data.gesture_dis_point = 1000;
 		radar_factory_data.gesture_spd_point = 20;	//2KM/H
+
+		radar_factory_data.dis_spd_offset_status = speed_offset_disable;
+		radar_factory_data.pwm_point = 150;
+
+		radar_factory_data.cover_point = 150;
 	}
 
 
 	radar_user_data.device_address = 0x30;
 
 	RADAR_CALIBRATION_MODE = FREE_MODE;
+
+	MEM_Clr(&dis_depart, sizeof(dis_depart));
+	MEM_Clr(&dis_approach, sizeof(dis_approach));
 }
 
 void RADAR_Process(void)
@@ -301,7 +303,7 @@ void radarsense2gol_result( uint32_t *fft_magnitude_array,
 		uint32_t max_frq_mag,
 		uint32_t max_frq_index)
 {
-	INT16U word_buffer[4];
+//	INT16U word_buffer[4];
 	RADAR_CALIBRATION_MODE_Type cal_mode;
 
 	// copy raw data and fft data and motion indicator to global variables used in micrium GUI
@@ -321,72 +323,29 @@ void radarsense2gol_result( uint32_t *fft_magnitude_array,
 	g_doppler_frequency = calcDopplerFrequency(max_frq_index);
 	g_doppler_velocity = calcDopplerSpeed(g_doppler_frequency);
 
-	g_motion = motion;
-	// check results
-	if (motion != XMC_NO_MOTION_DETECT &&			// motion detected
-	    g_doppler_velocity > g_min_velocity &&		// doppler velocity is greater than min velocity
-		g_doppler_velocity < g_max_velocity)		// doppker velocity is less than max veloctiy
-	{
-		if (motion == XMC_MOTION_DETECT_APPROACHING)	// target is approaching radar
-		{
-			// turn on red LED, turn off orange and blue LEDs
-//			DIGITAL_IO_SetOutputLow(&LED_RED);
-//			DIGITAL_IO_SetOutputHigh(&LED_ORANGE);
-//			DIGITAL_GPIO_SetOutputLow(&LED_BLUE);
-		}
-		else // motion == XMC_MOTION_DETECT_DEPARTING => target is moving away from radar
-		{
-			// turn on orange LED, turn off red and blue LEDs
-			DIGITAL_GPIO_SetOutputLow(&LED_ORANGE);
-//			DIGITAL_IO_SetOutputHigh(&LED_RED);
-//			DIGITAL_IO_SetOutputHigh(&LED_BLUE);
-		}
-	}
-	else // no motion detected
-	{
-		// turn on blue LED, turn off red and blue LEDs
-//		DIGITAL_GPIO_SetOutputHigh(&LED_BLUE);
-		DIGITAL_GPIO_SetOutputHigh(&LED_ORANGE);
-//		DIGITAL_IO_SetOutputHigh(&LED_RED);
-
-		// set velocity and frequency to 0 in case of no motion
-		g_doppler_frequency = 0.0;
-		g_doppler_velocity = 0.0;
-		g_motion = XMC_NO_MOTION_DETECT;
-	}
+	/*-- motion update --*/
+	Radar_MotionUpdate(motion);
 
 	/*-- distance update --*/
 	Radar_DistanceUpdate();
 
+	/*-- Toilet Cover update --*/
+	Radar_ToiletCoverUpdate();
+
+	/*-- PWM State update --*/
+	Radar_PWMStateUpdate();
+
 	/*-- Calibration --*/
-	Radar_SearchMaxMinSamplingData(g_sampling_data_I, BUFF_SIZE, word_buffer);
 	RADAR_GetCalibrationMode(&cal_mode);
 	if(cal_mode == CALIBRATION_MODE)
 	{
-		RADAR_SetAmplitudeCalValue(word_buffer[0] - word_buffer[1]);
+		RADAR_SetAmplitudeCalValue(CUR_AMPLITUDE_VALUE);
 	}
+
+
+	Protocol_heart_beat();
 }
 
-void Radar_SearchMaxMinSamplingData(INT16U *input, INT16U size, INT16U *output)
-{
-	INT16U i;
-
-	output[0] = input[0];
-	output[1] = input[0];
-
-	for(i = 0; i < size; i++)
-	{
-		if(input[i] > output[0])
-		{
-			output[0] = input[i];	//serch max data
-		}
-
-		if(input[i] < output[1])
-		{
-			output[1] = input[i];	//search min data
-		}
-	}
-}
 
 void RADAR_FactoryDataInitFromFlash(void)
 {
@@ -420,464 +379,256 @@ void RADAR_UserDataInitFromDefaults(void)
 	}
 }
 
-
-
-/*
- * API
- */
-
-INT16U DistanceLinear(INT16U base_dis, INT16U samle_value, INT16U *cal_table)
-{
-	INT16U output = 250;
-
-	if(cal_table[0] == cal_table[1])
-	{
-		return output;
-	}
-
-	output = base_dis - (((samle_value - cal_table[1]) * 50) / (cal_table[0] - cal_table[1]));
-
-	return output;
-}
-
-/*INT16U DistanceCalOffset(INT16U cur_amp)
-{
-	INT16U output = 0;
-	INT16U base_distance;
-
-	if(cur_amp >= radar_factory_data.cal_table_type.table[0])
-	{
-		output = 50;
-
-		base_distance = 10 * radar_factory_data.cal_table_type.minDistance;
-	}
-	else if(cur_amp > radar_factory_data.cal_table_type.table[1])
-	{
-		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + DISTANCE_STEP;
-
-		output = DistanceLinear(100, cur_amp, &radar_factory_data.cal_table_type.table[0]);//100
-
-		output += radar_factory_data.distance_offset[0];
-	}
-	else if(cur_amp > radar_factory_data.cal_table_type.table[2])
-	{
-		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 2 * DISTANCE_STEP;
-
-		output = DistanceLinear(150, cur_amp, &radar_factory_data.cal_table_type.table[1]);//150
-
-		output += radar_factory_data.distance_offset[1];
-	}
-	else if(cur_amp > radar_factory_data.cal_table_type.table[3])
-	{
-		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 3 * DISTANCE_STEP;
-
-		output = DistanceLinear(base_distance, cur_amp, &radar_factory_data.cal_table_type.table[2]);//200
-
-		output += radar_factory_data.distance_offset[2];
-	}
-	else if(cur_amp > radar_factory_data.cal_table_type.table[4])
-	{
-		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 4 * DISTANCE_STEP;
-
-		output = DistanceLinear(base_distance, cur_amp, &radar_factory_data.cal_table_type.table[3]);//250
-
-		output += radar_factory_data.distance_offset[3];
-	}
-	else if(cur_amp > radar_factory_data.cal_table_type.table[5])
-	{
-		base_distance = 10 * radar_factory_data.cal_table_type.minDistance + 5 * DISTANCE_STEP;
-
-		output = DistanceLinear(base_distance, cur_amp, &radar_factory_data.cal_table_type.table[4]);//300
-
-		output += radar_factory_data.distance_offset[4];
-	}
-	else
-	{
-		output = 300;
-	}
-
-	return output;
-}*/
-
-static INT16U Distance_GetDistanceBufferMin(INT16U * buffer, INT8U size)
+__STATIC_INLINE INT16U Distance_GetBufferSum(INT16U *buffer, INT8U size)
 {
 	INT8U  i;
 	INT16U output = 0;
 
-	output = buffer[0];
 	for(i = 0; i < size; i++)
 	{
-		if(output > buffer[i])
-		{
-			output = buffer[i];
-		}
+		output += buffer[i];
 	}
 
 	return output;
 }
 
-#if 0
-INT16U dis_buffer[3] = {160};
-INT16U amp_buffer[3] = {0};
-void RADAR_GetDistance(INT8U *output)
+__STATIC_INLINE INT16U Distance_CalLatestDistance(INT16U cur_amplitude)
 {
-	INT16U value = 0;
-	INT16U buffer[2], cur_speed;
-	INT16U new_distance_value = 0;
-	volatile static INT32U cur_distance_value;
-	volatile static INT8U startup = 0;
-//	volatile static INT16U dis_buffer[20];
-	INT16U i, size;
-	INT32U dis_sum;
+	INT16U output = 0;
+
+	output = radar_factory_data.cal_table_type.table[0] / 2;
+	output = (100 * output) / cur_amplitude;
+
+	return output;
+}
+
+INT16U Distance_CalMaxAmplitude(void)
+{
+	INT16U i;
+	INT16U output = 0;
+	INT16U max_value, min_value;
+
+	max_value = g_sampling_data_I[0];
+	min_value = max_value;
+
+	for(i = 0; i < BUFF_SIZE; i++)
+	{
+		if(g_sampling_data_I[i] > max_value)
+		{
+			max_value = g_sampling_data_I[i];	//serch max data
+		}
+
+		if(g_sampling_data_I[i] < min_value)
+		{
+			min_value = g_sampling_data_I[i];	//search min data
+		}
+	}
+
+	output = max_value - min_value;
+
+	return output;
+}
+
+__STATIC_INLINE void Distance_JitterResistant(XMC_RADARSENSE2GOL_MOTION_t motion, Diatance_Type *depart, Diatance_Type *approach)
+{
+	if(motion == XMC_MOTION_DETECT_APPROACHING)
+	{
+		depart->filter_cnt = 0;
+
+		approach->filter_cnt++;
+		if(approach->filter_cnt >= MOTION_FILTER_CNT)
+		{
+			approach->filter_cnt = MOTION_FILTER_CNT;
+		}
+	}
+	else	// depart
+	{
+		approach->filter_cnt = 0;
+
+		depart->filter_cnt++;
+		if(depart->filter_cnt >= MOTION_FILTER_CNT)
+		{
+			depart->filter_cnt = MOTION_FILTER_CNT;
+		}
+	}
+}
+
+/*__STATIC_INLINE bool Distance_FilterInvalidData(Diatance_Type *depart, Diatance_Type *approach, INT16U *cur_distance)
+{
+	bool status = true;
+	INT16U dis_sum;
+	INT16U average_value;
+	INT16U delta_distance = 0;
 	INT8U  byte_buffer[2];
-
-	XMC_RADARSENSE2GOL_MOTION_t motion;
-
-	Radar_SearchMaxMinSamplingData(g_sampling_data_I, BUFF_SIZE, buffer);
-
-	value = buffer[0] - buffer[1];
-
+	INT16U cur_speed, dis_offset = 0;
+	DISTANCE_SPEED_OFFSET_Type  speed_status;
 
 	RADAR_GetSpeed(byte_buffer);
 	cur_speed = get16(byte_buffer);
 
+	dis_sum = Distance_GetBufferSum(RADAR_DISTANCE_BUFFER, sizeof(RADAR_DISTANCE_BUFFER) / 2);
+	average_value = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
 
-	RADAR_GetMotion(&motion);
+	dis_offset = (10 * cur_speed) / 36; // 1Km/H = 100000/3600 = 27.7 cm/s = 2.77 cm/100ms
 
-#if 0
-	for(i = 0; i < (sizeof(dis_buffer) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
+	if(depart->filter_cnt == MOTION_FILTER_CNT)			//depart
 	{
-		dis_buffer[i] = dis_buffer[i + 1];
+		if(*cur_distance < average_value)
+		{
+			status = false;
+			return status;
+		}
+
+		delta_distance = *cur_distance - average_value;
+
+		dis_offset = average_value + dis_offset;
+	}
+	else	//approach
+	{
+		if(*cur_distance > average_value)
+		{
+			status = false;
+			return status;
+		}
+
+		delta_distance = average_value - *cur_distance;
+
+		dis_offset = average_value - dis_offset;
 	}
 
-	if((cur_speed < radar_factory_data.gesture_spd_point)
-		&& (SCH_Get_Flag(Flag_SampleFilter) == 0)
-		&& ((motion == XMC_MOTION_DETECT_APPROACHING) || (motion == XMC_MOTION_DETECT_DEPARTING)))
+	if(delta_distance > radar_factory_data.distance_point.step)
 	{
-		if(value >= radar_factory_data.cal_table_type.table[0])
+		RADAR_GetDistanceSpeedOffsetStatus(&speed_status);
+		if(speed_status == speed_offset_enable)
 		{
-			new_distance_value = 50;
-		}
-		else if(value > radar_factory_data.cal_table_type.table[1])
-		{
-			new_distance_value = DistanceLinear(100, value, &radar_factory_data.cal_table_type.table[0]);
-
-			new_distance_value += radar_factory_data.distance_offset[0];
-		}
-		else if(value > radar_factory_data.cal_table_type.table[2])
-		{
-			new_distance_value = DistanceLinear(150, value, &radar_factory_data.cal_table_type.table[1]);
-
-			new_distance_value += radar_factory_data.distance_offset[1];
-		}
-		else if(value > radar_factory_data.cal_table_type.table[3])
-		{
-			new_distance_value = DistanceLinear(200, value, &radar_factory_data.cal_table_type.table[2]);
-
-			new_distance_value += radar_factory_data.distance_offset[2];
-		}
-		else if(value > radar_factory_data.cal_table_type.table[4])
-		{
-			new_distance_value = DistanceLinear(250, value, &radar_factory_data.cal_table_type.table[3]);
-
-			new_distance_value += radar_factory_data.distance_offset[3];
-		}
-		else if(value > radar_factory_data.cal_table_type.table[5])
-		{
-			new_distance_value = DistanceLinear(300, value, &radar_factory_data.cal_table_type.table[4]);
-
-			new_distance_value += radar_factory_data.distance_offset[4];
+			*cur_distance = dis_offset;
 		}
 		else
 		{
-			new_distance_value = 300;
+			status = false;
+			return status;
 		}
+	}
 
-//		new_distance_value = DistanceCalOffset(value);
+	return status;
+}*/
 
-		if(motion == XMC_MOTION_DETECT_DEPARTING)//2019.01.17
+__STATIC_INLINE bool Distance_FilterInvalidData(Diatance_Type *depart, Diatance_Type *approach, INT16U *cur_distance)
+{
+	bool status = true;
+	INT16U dis_sum;
+	INT16U average_value;
+	INT16U delta_distance = 0;
+	INT8U  byte_buffer[2];
+	INT16U cur_speed, dis_offset = 0;
+	DISTANCE_SPEED_OFFSET_Type  speed_status;
+
+	RADAR_GetSpeed(byte_buffer);
+	cur_speed = get16(byte_buffer);
+
+	dis_sum = Distance_GetBufferSum(RADAR_DISTANCE_BUFFER, sizeof(RADAR_DISTANCE_BUFFER) / 2);
+	average_value = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
+
+	dis_offset = (10 * cur_speed) / 36; // 1Km/H = 100000/3600 = 27.7 cm/s = 2.77 cm/100ms
+
+	dis_offset = dis_offset / 4;
+
+	if(depart->filter_cnt == MOTION_FILTER_CNT)			//depart
+	{
+		if(*cur_distance < average_value)
 		{
-			if((new_distance_value > dis_buffer[sizeof(dis_buffer)/2 - 2])
-			&& ((new_distance_value - dis_buffer[sizeof(dis_buffer)/2 - 2]) < radar_factory_data.gesture_dis_point))
-//			if(new_distance_value > dis_buffer[sizeof(dis_buffer)/2 - 2])
+			if(radar_factory_data.dis_spd_offset_status == speed_offset_enable)
 			{
-				dis_buffer[sizeof(dis_buffer)/2 - 1] = new_distance_value;
+				status = true;
 			}
 			else
 			{
-				dis_buffer[sizeof(dis_buffer)/2 - 1] = dis_buffer[sizeof(dis_buffer)/2 - 2];
-			}
-		}
-		else if((motion == XMC_MOTION_DETECT_APPROACHING)
-			&& (new_distance_value <dis_buffer[sizeof(dis_buffer)/2 - 2]))
-		{
-			dis_buffer[sizeof(dis_buffer)/2 - 1] = new_distance_value;
-		}
-		else
-		{
-			dis_buffer[sizeof(dis_buffer)/2 - 1] = dis_buffer[sizeof(dis_buffer)/2 - 2];
-		}
-
-//		dis_buffer[sizeof(dis_buffer)/2 - 1] = new_distance_value;
-	}
-	else
-	{
-		if(SCH_Get_Flag(Flag_SampleFilter) == 0)
-		{
-			SCH_Add_Flag(Flag_SampleFilter, SCH_FLAG_300MS);
-		}
-
-		size = (sizeof(dis_buffer) / 2) / 3;
-		for(dis_sum = 0, i = 0; i < size; i++)
-		{
-			dis_sum += dis_buffer[i];
-		}
-
-		dis_sum = dis_sum / size;
-
-		for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
-		{
-			dis_buffer[i] = dis_sum;
-		}
-	}
-
-	if(startup == 0)
-	{
-		startup = 1;
-
-		cur_distance_value = new_distance_value;
-
-		if(new_distance_value > 0)
-		{
-			for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
-			{
-				dis_buffer[i] = cur_distance_value;
-			}
-		}
-		else
-		{
-			for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
-			{
-				dis_buffer[i] = 160;//default
+				status = false;
 			}
 
-			cur_distance_value = dis_buffer[0];
+			dis_offset = average_value + dis_offset;
+			*cur_distance = dis_offset;
+			return status;
 		}
+
+		delta_distance = *cur_distance - average_value;
+		dis_offset = average_value + dis_offset;
 	}
-
-
-	dis_sum = 0;
-	for(i = 0; i < (sizeof(dis_buffer) / 2); i++)
+	else	//approach
 	{
-		dis_sum += dis_buffer[i];
-	}
-
-	new_distance_value = dis_sum / (sizeof(dis_buffer) / 2);
-
-//	new_distance_value = Distance_GetDistanceBufferMin(dis_buffer, sizeof(dis_buffer) / 2);//2019-01-17
-
-	RADAR_GetMotion(&motion);
-
-	if(motion == XMC_MOTION_DETECT_APPROACHING)
-	{
-		if(new_distance_value <= cur_distance_value)
+		if(*cur_distance > average_value)
 		{
-			cur_distance_value = new_distance_value;
-		}
-	}
-	else if(motion == XMC_MOTION_DETECT_DEPARTING)
-	{
-		if(new_distance_value >= cur_distance_value)
-		{
-			cur_distance_value = new_distance_value;
-		}
-	}
-
-#endif
-
-
-#if 0
-	if((motion != XMC_NO_MOTION_DETECT)
-	&& (cur_speed < radar_factory_data.gesture_spd_point)
-	&& (cur_speed > radar_factory_data.distance_point.speed))
-	{
-		new_distance_value = radar_factory_data.cal_table_type.table[0] / 2;
-		new_distance_value = (100 * new_distance_value) / value;
-
-		if(startup == 0)
-		{
-			if(new_distance_value <= 300)
+			if(radar_factory_data.dis_spd_offset_status == speed_offset_enable)
 			{
-				startup = 1;
-
-				for(i = 0; i < sizeof(amp_buffer) / 2; i++)
-				{
-					amp_buffer[i] = new_distance_value;
-				}
-			}
-		}
-
-		dis_sum = 0;
-		for(i = 0; i < (sizeof(amp_buffer) / 2); i++)
-		{
-			dis_sum += amp_buffer[i];
-		}
-
-		INT16U average_value;
-		INT16U delta_distance;
-
-		average_value = dis_sum / (sizeof(amp_buffer) / 2);
-
-		if(new_distance_value > average_value)
-		{
-			delta_distance = new_distance_value - average_value;
-		}
-		else
-		{
-			delta_distance = average_value - new_distance_value;
-		}
-
-		if((((motion == XMC_MOTION_DETECT_DEPARTING)   && (new_distance_value > average_value))
-		|| ((motion == XMC_MOTION_DETECT_APPROACHING) && (new_distance_value < average_value)))
-		&& (delta_distance < radar_factory_data.distance_point.step)
-		&& (new_distance_value <= 300))
-		{
-			for(i = 0; i < (sizeof(amp_buffer) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
-			{
-				amp_buffer[i] = amp_buffer[i + 1];
-			}
-
-			amp_buffer[sizeof(amp_buffer) / 2 - 1] = new_distance_value;
-
-			dis_sum = 0;
-			for(i = 0; i < (sizeof(amp_buffer) / 2); i++)
-			{
-				dis_sum += amp_buffer[i];
-			}
-
-			cur_distance_value = dis_sum / (sizeof(amp_buffer) / 2);
-		}
-		else
-		{
-			cur_distance_value = dis_sum / (sizeof(amp_buffer) / 2);
-		}
-	}
-#endif
-
-
-	static INT8U depart_cnt = 0, approach_cnt = 0;
-	static INT16U depart_buffer[2] = {0}, approach_buffer[2] = {0};
-
-	if(motion == XMC_NO_MOTION_DETECT)
-	{
-		depart_cnt = 0;
-		approach_cnt = 0;
-	}
-
-	if((motion != XMC_NO_MOTION_DETECT)
-	&& (cur_speed < radar_factory_data.gesture_spd_point)
-	&& (cur_speed > radar_factory_data.distance_point.speed))
-	{
-		new_distance_value = radar_factory_data.cal_table_type.table[0] / 2;
-		new_distance_value = (100 * new_distance_value) / value;
-
-		if(new_distance_value <= 300)
-		{
-			if(motion == XMC_MOTION_DETECT_APPROACHING)
-			{
-				depart_cnt = 0;
-
-				approach_cnt++;
-				if(approach_cnt >= MOTION_FILTER_CNT)
-				{
-					approach_cnt = MOTION_FILTER_CNT;
-				}
+				status = true;
 			}
 			else
 			{
-				approach_cnt = 0;
-
-				depart_cnt++;
-				if(depart_cnt >= MOTION_FILTER_CNT)
-				{
-					depart_cnt = MOTION_FILTER_CNT;
-				}
+				status = false;
 			}
 
-			if((depart_cnt == MOTION_FILTER_CNT) || (approach_cnt == MOTION_FILTER_CNT))
-			{
-				startup++;
-				if(startup >= MOTION_FILTER_CNT)
-				{
-					startup = MOTION_FILTER_CNT;
-				}
+			dis_offset = average_value - dis_offset;
+			*cur_distance = dis_offset;
 
-				for(i = 0; i < (sizeof(amp_buffer) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
-				{
-					amp_buffer[i] = amp_buffer[i + 1];
-				}
-
-				if(depart_cnt == 2)
-				{
-					depart_buffer[0] = depart_buffer[1];
-
-					depart_buffer[1] = new_distance_value;
-
-					amp_buffer[sizeof(amp_buffer) / 2 - 1] = (depart_buffer[0] + depart_buffer[1]) / 2;
-				}
-				else
-				{
-					approach_buffer[0] = approach_buffer[1];
-
-					approach_buffer[1] = new_distance_value;
-					amp_buffer[sizeof(amp_buffer) / 2 - 1] = (approach_buffer[0] + approach_buffer[1]) / 2;
-				}
-			}
-
-//			INT16U average_value;
-//			INT16U delta_distance;
-
-			dis_sum = 0;
-			for(i = 0; i < (sizeof(amp_buffer) / 2); i++)
-			{
-				dis_sum += amp_buffer[i];
-			}
-
-			cur_distance_value = dis_sum / (sizeof(amp_buffer) / 2);
-
-//			cur_distance_value = amp_buffer[sizeof(amp_buffer) / 2 - 1];
+			return status;
 		}
 
+		delta_distance = average_value - *cur_distance;
+		dis_offset = average_value - dis_offset;
 	}
 
-
-	if(cur_distance_value <= 150)
+	if(delta_distance > radar_factory_data.distance_point.step)
 	{
-		PWM_SetState(PWM_ENABLE);
-	}
-	else
-	{
-		PWM_SetState(PWM_LOW);
+		RADAR_GetDistanceSpeedOffsetStatus(&speed_status);
+		if(speed_status == speed_offset_enable)
+		{
+			*cur_distance = dis_offset;
+		}
+		else
+		{
+			status = false;
+			return status;
+		}
 	}
 
-	output[0] = WORD_HIGH(cur_distance_value);
-	output[1] = WORD_LOW(cur_distance_value);
+	return status;
 }
-#endif
+
+__STATIC_INLINE void Distance_DistanceBufferUpdate(Diatance_Type *depart, Diatance_Type *approach, INT16U cur_distance)
+{
+	INT8U  i;
+	INT16U dis_sum;
+	INT16U average_value;
+
+	dis_sum = Distance_GetBufferSum(RADAR_DISTANCE_BUFFER, sizeof(RADAR_DISTANCE_BUFFER) / 2);
+	average_value = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
+
+	for(i = 0; i < (sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
+	{
+		RADAR_DISTANCE_BUFFER[i] = RADAR_DISTANCE_BUFFER[i + 1];	//Throw away the oldest data.
+	}
+
+	if(depart->filter_cnt == MOTION_FILTER_CNT)
+	{
+		depart->buffer[0] = average_value;
+		depart->buffer[1] = cur_distance;
+
+		RADAR_DISTANCE_BUFFER[sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1] = (depart->buffer[0] + depart->buffer[1]) / 2;
+	}
+	else
+	{
+		approach->buffer[0] = average_value;
+		approach->buffer[1] = cur_distance;
+
+		RADAR_DISTANCE_BUFFER[sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1] = (approach->buffer[0] + approach->buffer[1]) / 2;
+	}
+}
 
 void Radar_DistanceUpdate(void)
 {
-	INT8U  i;
-	INT16U word_buffer[6];
-	INT8U  byte_buffer[6];
-
+	INT8U  byte_buffer[4];
 	INT16U cur_speed, new_distance_value;
 	XMC_RADARSENSE2GOL_MOTION_t motion;
-	INT16U average_value;
-	INT16U delta_distance;
-	static INT8U depart_cnt = 0, approach_cnt = 0;
-	static INT16U depart_buffer[2] = {0}, approach_buffer[2] = {0};
-
 	static INT8U startup = 0;
 	INT16U dis_sum;
 
@@ -885,230 +636,123 @@ void Radar_DistanceUpdate(void)
 	cur_speed = get16(byte_buffer);
 	RADAR_GetMotion(&motion);
 
-	Radar_SearchMaxMinSamplingData(g_sampling_data_I, BUFF_SIZE, word_buffer);
-	CUR_AMPLITUDE_VALUE = word_buffer[0] - word_buffer[1];
 
+	CUR_AMPLITUDE_VALUE = Distance_CalMaxAmplitude();
 
-/*	if(motion == XMC_NO_MOTION_DETECT)
+	if(cur_speed >= radar_factory_data.gesture_spd_point)
 	{
-		depart_cnt = 0;
-		approach_cnt = 0;
-	}*/
+		SCH_Add_Flag(Flag_DistanceDelay, SCH_FLAG_200MS);
+	}
 
-	if((motion != XMC_NO_MOTION_DETECT)
-	&& (cur_speed < radar_factory_data.gesture_spd_point)
-	&& (cur_speed > radar_factory_data.distance_point.speed))
+	if((SCH_Get_Flag(Flag_DistanceDelay) > 0)
+	|| (motion == XMC_NO_MOTION_DETECT)
+	|| (cur_speed <= radar_factory_data.distance_point.speed))
 	{
-		new_distance_value = radar_factory_data.cal_table_type.table[0] / 2;
-		new_distance_value = (100 * new_distance_value) / CUR_AMPLITUDE_VALUE;
+		return;
+	}
 
-		if(new_distance_value <= 300)
+	new_distance_value = Distance_CalLatestDistance(CUR_AMPLITUDE_VALUE);
+
+	if((new_distance_value < 10 * radar_factory_data.cal_table_type.minDistance)
+	|| (new_distance_value > 10 * radar_factory_data.cal_table_type.maxDistance))
+	{
+		return;
+	}
+
+	Distance_JitterResistant(motion, &dis_depart, &dis_approach);
+
+	if((dis_depart.filter_cnt == MOTION_FILTER_CNT) || (dis_approach.filter_cnt == MOTION_FILTER_CNT))
+	{
+		startup++;
+		if(startup >= MOTION_FILTER_CNT)
 		{
-			if(motion == XMC_MOTION_DETECT_APPROACHING)
-			{
-				depart_cnt = 0;
-
-				approach_cnt++;
-				if(approach_cnt >= MOTION_FILTER_CNT)
-				{
-					approach_cnt = MOTION_FILTER_CNT;
-				}
-			}
-			else
-			{
-				approach_cnt = 0;
-
-				depart_cnt++;
-				if(depart_cnt >= MOTION_FILTER_CNT)
-				{
-					depart_cnt = MOTION_FILTER_CNT;
-				}
-			}
-
-			if((depart_cnt == MOTION_FILTER_CNT) || (approach_cnt == MOTION_FILTER_CNT))
-			{
-				startup++;
-				if(startup >= MOTION_FILTER_CNT)
-				{
-					startup = MOTION_FILTER_CNT;
-				}
-
-
-				dis_sum = 0;
-				for(i = 0; i < (sizeof(RADAR_DISTANCE_BUFFER) / 2); i++)
-				{
-					dis_sum += RADAR_DISTANCE_BUFFER[i];
-				}
-
-				average_value = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
-
-				if(depart_cnt == MOTION_FILTER_CNT)
-				{
-					if(new_distance_value < average_value)
-					{
-						return;
-					}
-
-					delta_distance = new_distance_value - average_value;
-					if(delta_distance > radar_factory_data.distance_point.step)
-					{
-						return;
-					}
-
-//					depart_buffer[0] = depart_buffer[1];
-					depart_buffer[0] = average_value;
-
-					depart_buffer[1] = new_distance_value;
-
-
-					for(i = 0; i < (sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
-					{
-						RADAR_DISTANCE_BUFFER[i] = RADAR_DISTANCE_BUFFER[i + 1];
-					}
-					RADAR_DISTANCE_BUFFER[sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1] = (depart_buffer[0] + depart_buffer[1]) / 2;
-				}
-				else	//approach
-				{
-					if(new_distance_value > average_value)
-					{
-						return;
-					}
-
-					delta_distance = average_value - new_distance_value;
-					if(delta_distance > radar_factory_data.distance_point.step)
-					{
-						return;
-					}
-
-
-//					approach_buffer[0] = approach_buffer[1];
-					approach_buffer[0] = average_value;
-
-					approach_buffer[1] = new_distance_value;
-
-					for(i = 0; i < (sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1); i++) //dis_buffer[sizeof(dis_buffer) - 1] Stay the same
-					{
-						RADAR_DISTANCE_BUFFER[i] = RADAR_DISTANCE_BUFFER[i + 1];
-					}
-					RADAR_DISTANCE_BUFFER[sizeof(RADAR_DISTANCE_BUFFER) / 2 - 1] = (approach_buffer[0] + approach_buffer[1]) / 2;
-				}
-			}
-
-			dis_sum = 0;
-			for(i = 0; i < (sizeof(RADAR_DISTANCE_BUFFER) / 2); i++)
-			{
-				dis_sum += RADAR_DISTANCE_BUFFER[i];
-			}
-
-			CUR_DISTANCE_VALUE = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
-
-//			CUR_DISTANCE_VALUE = amp_buffer[sizeof(amp_buffer) / 2 - 1];
+			startup = MOTION_FILTER_CNT;
 		}
 
+		if(Distance_FilterInvalidData(&dis_depart, &dis_approach, &new_distance_value) == false)
+		{
+			return;
+		}
+
+		Distance_DistanceBufferUpdate(&dis_depart, &dis_approach, new_distance_value);
 	}
+
+
+	dis_sum = Distance_GetBufferSum(RADAR_DISTANCE_BUFFER, sizeof(RADAR_DISTANCE_BUFFER) / 2);
+
+	CUR_DISTANCE_VALUE = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
+
+//	CUR_DISTANCE_VALUE = amp_buffer[sizeof(amp_buffer) / 2 - 1];
 }
 
-void RADAR_GetDistance(INT8U *output)
+void Radar_MotionUpdate(XMC_RADARSENSE2GOL_MOTION_t motion)
 {
-	output[0] = WORD_HIGH(CUR_DISTANCE_VALUE);
-	output[1] = WORD_LOW(CUR_DISTANCE_VALUE);
-}
+	g_motion = motion;
+	// check results
+	if (motion != XMC_NO_MOTION_DETECT &&			// motion detected
+	    g_doppler_velocity > g_min_velocity &&		// doppler velocity is greater than min velocity
+		g_doppler_velocity < g_max_velocity)		// doppker velocity is less than max veloctiy
+	{
+		if (motion == XMC_MOTION_DETECT_APPROACHING)	// target is approaching radar
+		{
 
-void Radar_MotionUpdate(void)
-{
+		}
+		else // motion == XMC_MOTION_DETECT_DEPARTING => target is moving away from radar
+		{
 
+		}
+	}
+	else // no motion detected
+	{
+		DIGITAL_GPIO_SetOutputHigh(&LED_ORANGE);
+
+		// set velocity and frequency to 0 in case of no motion
+		g_doppler_frequency = 0.0;
+		g_doppler_velocity = 0.0;
+		g_motion = XMC_NO_MOTION_DETECT;
+	}
 }
 
 void Radar_PWMStateUpdate(void)
 {
+	INT8U  byte_buffer[4];
+	INT8U  pwm_point;
 
+	RADAR_GetDistance(byte_buffer);
+	get16(byte_buffer);
+
+//	if(get16(byte_buffer) <= 150)
+	RADAR_GetPWMTripPoint(&pwm_point);
+	if(get16(byte_buffer) <= pwm_point)
+	{
+//		PWM_SetState(PWM_ENABLE);
+		PWM_Start();
+	}
+	else
+	{
+//		PWM_SetState(PWM_LOW);
+		PWM_Stop();
+	}
 }
 
 void Radar_ToiletCoverUpdate(void)
 {
-
-}
-
-void RADAR_GetSpeed(INT8U *output)
-{
-	INT16U speed = 0;
-
-	speed = (10 * g_doppler_velocity);
-
-	output[0] = WORD_HIGH(speed);
-	output[1] = WORD_LOW(speed);
-}
-
-void RADAR_GetSignal(INT8U *output)
-{
-	INT16U value = 0;
-
-	value = 10 * g_doppler_frequency;
-
-	output[0] = WORD_HIGH(value);
-	output[1] = WORD_LOW(value);
-}
-
-void RADAR_GetAmplitude(INT8U *output)
-{
-	INT16U value = 0;
-	INT16U buffer[2];
-
-	Radar_SearchMaxMinSamplingData(g_sampling_data_I, BUFF_SIZE, buffer);
-
-	value = buffer[0] - buffer[1];
-	output[0] = WORD_HIGH(value);
-	output[1] = WORD_LOW(value);
-}
-
-void RADAR_GetMotion(INT8U *output)
-{
-	output[0] = g_motion;
-}
-
-void RADAR_GetGesture(INT8U *output)
-{
-	INT8U buffer[2];
-	INT16U cur_speed;
-//	static RADAR_GESTURE_Type state = GESTURE_UNDEFINED;
-	RADAR_TOILET_COVER_Type cover_status;
-
-	RADAR_GetSpeed(buffer);
-	cur_speed = get16(buffer);
-
-//	RADAR_GetDistance(buffer);
-//	cur_distance = get16(buffer);
-
-	RADAR_GetToiletCoverAStatus(&cover_status);
-
-	if((cur_speed > radar_factory_data.gesture_spd_point)
-	&& (cover_status == TOILET_COVER_OPENED))
-	{
-//		state = GESTURE_DETECTED;
-
-		RADAR_SetToiletCoverBStatus(TOILET_COVER_OPENED);
-	}
-
-//	if(cur_distance >150)
-//	{
-//		state = NO_GESTURE_DETECTED;
-//	}
-
-	RADAR_GetToiletCoverBStatus(output);
-}
-
-void RADAR_GetToiletCover(INT8U *output)
-{
 	INT8U  buffer[5];
+	INT16U cur_speed, cur_distance;
+	RADAR_TOILET_COVER_Type cover_status;
 	RADAR_TOILET_COVER_Type cover_b_state;
+	INT8U  cover_point;
 
+	/* toilet main cover control */
 	RADAR_GetDistance(buffer);
+	cur_distance = get16(buffer);
 
-	if(get16(buffer) < 150)
+	RADAR_GetCoverOpenedTripPoint(&cover_point);
+
+	if(cur_distance < cover_point)
 	{
-		SCH_Add_Flag(Flag_CoverADelay, SCH_FLAG_10000MS);
-
-//		state = TOILET_COVER_OPENED;
+		SCH_Add_Flag(Flag_CoverADelay, SCH_FLAG_3000MS);
+//		SCH_Add_Flag(Flag_CoverADelay, SCH_FLAG_10000MS);
 
 		RADAR_SetToiletCoverAStatus(TOILET_COVER_OPENED);
 	}
@@ -1136,15 +780,67 @@ void RADAR_GetToiletCover(INT8U *output)
 		}
 	}
 
+	/* toilet secondary cover control */
 
+	RADAR_GetSpeed(buffer);
+	cur_speed = get16(buffer);
 
-//	output[0] = state;
+	RADAR_GetToiletCoverAStatus(&cover_status);
 
+	if((cur_speed > radar_factory_data.gesture_spd_point)
+	&& (cover_status == TOILET_COVER_OPENED)
+	&& (cur_distance > radar_factory_data.gesture_dis_point))
+	{
+//		state = GESTURE_DETECTED;
+
+		RADAR_SetToiletCoverBStatus(TOILET_COVER_OPENED);
+	}
+}
+
+//API
+
+void RADAR_GetDistance(INT8U *output)
+{
+	output[0] = WORD_HIGH(CUR_DISTANCE_VALUE);
+	output[1] = WORD_LOW(CUR_DISTANCE_VALUE);
+}
+
+void RADAR_GetSpeed(INT8U *output)
+{
+	INT16U speed = 0;
+
+	speed = (10 * g_doppler_velocity);
+
+	output[0] = WORD_HIGH(speed);
+	output[1] = WORD_LOW(speed);
+}
+
+void RADAR_GetSignal(INT8U *output)
+{
+	INT16U value = 0;
+
+	value = 10 * g_doppler_frequency;
+
+	output[0] = WORD_HIGH(value);
+	output[1] = WORD_LOW(value);
+}
+
+void RADAR_GetAmplitude(INT8U *output)
+{
+	output[0] = WORD_HIGH(CUR_AMPLITUDE_VALUE);
+	output[1] = WORD_LOW(CUR_AMPLITUDE_VALUE);
+}
+
+void RADAR_GetMotion(INT8U *output)
+{
+	output[0] = g_motion;
+}
+
+void RADAR_GetToiletCover(INT8U *output)
+{
 	RADAR_GetToiletCoverAStatus(output);
 }
 
-
-//API
 
 void RADAR_SetToiletCoverAStatus(RADAR_TOILET_COVER_Type status)
 {
@@ -1201,4 +897,18 @@ void RADAR_GetAmplitudeCalValue(INT8U *output)
 	output[1] = WORD_LOW(AMPLITUDE_CAL_VALUE);
 }
 
+void RADAR_GetPWMTripPoint(INT8U *output)
+{
+	output[0] = radar_factory_data.pwm_point;
+}
+
+void RADAR_GetDistanceSpeedOffsetStatus(INT8U *output)
+{
+	output[0] = radar_factory_data.dis_spd_offset_status;
+}
+
+void RADAR_GetCoverOpenedTripPoint(INT8U *output)
+{
+	output[0] = radar_factory_data.cover_point;
+}
 

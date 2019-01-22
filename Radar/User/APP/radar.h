@@ -50,6 +50,12 @@ typedef struct
 	INT8U speed;
 }DISTANCE_TRIP_POINT_Type;
 
+typedef enum
+{
+	speed_offset_enable = 0,
+	speed_offset_disable = 1
+}DISTANCE_SPEED_OFFSET_Type;
+
 typedef struct
 {
 	INT8S  distance_offset[8];
@@ -65,6 +71,10 @@ typedef struct
 	INT8U  gesture_spd_point;
 
 	DISTANCE_TRIP_POINT_Type distance_point;
+
+	DISTANCE_SPEED_OFFSET_Type dis_spd_offset_status;
+	INT8U  pwm_point;
+	INT8U  cover_point;
 
 }RADAR_FACTORY_DATA_Type;
 
@@ -91,6 +101,13 @@ typedef enum
 	CALIBRATION_MODE = 0x30,
 	FREE_MODE = 0x31
 } RADAR_CALIBRATION_MODE_Type;
+
+
+typedef struct
+{
+	INT8U  filter_cnt;
+	INT16U buffer[2];
+}Diatance_Type;
 
 
 /*
@@ -144,13 +161,17 @@ void RADAR_GetSpeed(INT8U *output);
 void RADAR_GetSignal(INT8U *output);
 void RADAR_GetAmplitude(INT8U *output);
 void RADAR_GetMotion(INT8U *output);
-void RADAR_GetGesture(INT8U *output);
 void RADAR_GetToiletCover(INT8U *output);
+void RADAR_GetToiletCoverBStatus(RADAR_TOILET_COVER_Type *status);
 
 void RADAR_SetCalibrationMode(RADAR_CALIBRATION_MODE_Type mode);
 void RADAR_GetCalibrationMode(RADAR_CALIBRATION_MODE_Type *mode);
 void RADAR_SetAmplitudeCalValue(INT16U amp);
 void RADAR_GetAmplitudeCalValue(INT8U *output);
+
+void RADAR_GetPWMTripPoint(INT8U *output);
+void RADAR_GetDistanceSpeedOffsetStatus(INT8U *output);
+void RADAR_GetCoverOpenedTripPoint(INT8U *output);
 
 
 #endif /* USER_APP_RADAR_H_ */

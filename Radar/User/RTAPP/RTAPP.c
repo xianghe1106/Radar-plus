@@ -76,7 +76,7 @@
 
 void APP_Task_Update(void)
 {
-	PWM_Update();
+//	PWM_Update();
 }
 
 

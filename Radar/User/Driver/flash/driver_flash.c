@@ -95,7 +95,7 @@ FLASH_ERROR_CODE_Type FLASH_WriteSpecificPage(FLASH_PAGE_Type page_type, INT8U *
 	MEM_Set(flash_buffer, 0xFF, sizeof(flash_buffer));
 	MEM_Copy(flash_buffer, pBuffer, size);
 
-	XMC_FLASH_ProgramVerifyPage(start_address, flash_buffer);
+	XMC_FLASH_ProgramVerifyPage((INT32U *)start_address, (INT32U *)flash_buffer);
 
 	return error_code;
 }
@@ -120,7 +120,7 @@ FLASH_ERROR_CODE_Type FLASH_ReadSpecificPage(FLASH_PAGE_Type page_type, INT8U *b
 
 	block_size = XMC_FLASH_BYTES_PER_PAGE / XMC_FLASH_BYTES_PER_BLOCK;
 
-	XMC_FLASH_ReadBlocks(start_address, (INT32U *)buffer, block_size);
+	XMC_FLASH_ReadBlocks((INT32U *)start_address, (INT32U *)buffer, block_size);
 
 	return error_code;
 }
@@ -142,7 +142,7 @@ FLASH_ERROR_CODE_Type Flash_EraseMemory(FLASH_PAGE_Type page_type)
 		return error_code;
 	}
 
-	XMC_FLASH_ErasePage(start_address);
+	XMC_FLASH_ErasePage((INT32U *)start_address);
 
 	return error_code;
 }

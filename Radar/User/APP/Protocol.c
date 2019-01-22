@@ -22,6 +22,7 @@
 #include "xmc_uart.h"
 #include "radar.h"
 #include "driver.h"
+#include "Message.h"
 
 /*
 *********************************************************************************************************
@@ -144,7 +145,11 @@ static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetSoftReset(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 
 
 static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg);
@@ -155,6 +160,9 @@ static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 
 
 static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg);
@@ -199,9 +207,11 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	{0x82 	, SetDistanceOffset						,0 },
 	{0x83 	, SetAmplitudeOffset					,0 },
 	{0x84 	, SetGestureTripPoint					,0 },
-
+	{0x85 	, SetSoftReset							,0 },
 	{0x86 	, SetDistanceTripPoint					,0 },
-
+	{0x87 	, SetDistanceSpeedOffsetState			,0 },
+	{0x88 	, SetPWMTripPoint						,0 },
+	{0x89 	, SetCoverOpenedTripPoint				,0 },
 
 	/*---------------------------------------------------
 	--
@@ -212,11 +222,14 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	{0xA1	, GetDeviceAddress						,1 },
 	{0xA2	, GetNotifyState						,1 },
 	{0xA3	, GetDistanceOffset						,8 },
-	{0xA4	, GetSummaryInfo						,11},
+	{0xA4	, GetSummaryInfo						,0 },
 	{0xA5	, GetAmplitudeOffset					,2 },
 	{0xA6	, GetGestureTripPoint					,3 },
 
 	{0xA7 	, GetDistanceTripPoint					,2 },
+	{0xA8 	, GetDistanceSpeedOffsetState			,1 },
+	{0xA9 	, GetPWMTripPoint						,1 },
+	{0xAA 	, GetCoverOpenedTripPoint				,1 },
 
 
 	/*---------------------------------------------------
@@ -388,53 +401,28 @@ INT16U Calculate_SUM_LRC(INT8U *Packet, INT8U length)
 
 void Protocol_heart_beat(void)
 {
-	INT8U  len;//tx_bufer
-	INT8U  buffer[5];
-//	INT16U cur_distance;
+	INT8U  tx_buffer[30];
+	ProtocolMsg_TypeDef ProtocolMsg;
+	INT8U  dynamicLen = 0;
 
 	if(notify_state != notify_enable)
 	{
 		return;
 	}
 
-	len = 11;
+	ProtocolMsg.Output      = &tx_buffer[4];
+	ProtocolMsg.DynamicLen  = &dynamicLen;
+
+	GetSummaryInfo(ProtocolMsg);
 
 	tx_buffer[0] = radar_user_data.device_address;	//device_adress
-	tx_buffer[1] = len;	//len
-
+	tx_buffer[1] = dynamicLen + 5;	//len
 	tx_buffer[2] = 0x01;	//command
-
 	tx_buffer[3] = 0x00;	//error code
 
-	RADAR_GetDistance(buffer);
-	tx_buffer[4] = buffer[0];	//distance
-	tx_buffer[5] = buffer[1];
+	tx_buffer[tx_buffer[1] - 1] = zxUTILS_Crc8(&tx_buffer[0], dynamicLen + 4) & 0xFF;	//check byte
 
-	RADAR_GetSpeed(buffer);
-	tx_buffer[6] = buffer[0];	//speed
-	tx_buffer[7] = buffer[1];
-
-	RADAR_GetMotion(buffer);
-	tx_buffer[8] = buffer[0];
-
-	RADAR_GetSignal(buffer);
-	tx_buffer[9] = buffer[0];	//Signal
-	tx_buffer[10] = buffer[1];
-
-	RADAR_GetAmplitude(buffer);
-	tx_buffer[11] = buffer[0];	//Amplitude
-	tx_buffer[12] = buffer[1];
-
-	RADAR_GetToiletCover(buffer);
-	tx_buffer[13] = buffer[0];
-
-	RADAR_GetGesture(buffer);
-	tx_buffer[14] = buffer[0];
-
-
-	tx_buffer[15] = zxUTILS_Crc8(&tx_buffer[0], len + 4) & 0xFF;	//check byte
-
-	send_uart_data(tx_buffer, len + 5);
+	send_uart_data(tx_buffer, tx_buffer[1]);
 }
 
 
@@ -606,9 +594,26 @@ static void GetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	ProtocolMsg.Output[1] = radar_factory_data.distance_point.speed;
 }
 
+static void GetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_GetDistanceSpeedOffsetStatus(ProtocolMsg.Output);
+}
+
+static void GetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_GetPWMTripPoint(ProtocolMsg.Output);
+}
+
+static void GetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_GetCoverOpenedTripPoint(ProtocolMsg.Output);
+}
+
 static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	INT8U buffer[5];
+
+	*ProtocolMsg.DynamicLen = 13;
 
 	RADAR_GetDistance(buffer);
 	ProtocolMsg.Output[0] = buffer[0];	//distance
@@ -630,10 +635,14 @@ static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg)
 	ProtocolMsg.Output[8] = buffer[1];
 
 	RADAR_GetToiletCover(buffer);
+	ProtocolMsg.Output[9] = buffer[0];
+
+	RADAR_GetToiletCoverBStatus(buffer);
 	ProtocolMsg.Output[10] = buffer[0];
 
-	RADAR_GetGesture(buffer);
-	ProtocolMsg.Output[9] = buffer[0];
+	RADAR_GetAmplitudeCalValue(buffer);
+	ProtocolMsg.Output[11] = buffer[0];
+	ProtocolMsg.Output[12] = buffer[1];
 }
 
 
@@ -753,6 +762,22 @@ static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	}
 }
 
+static void SetSoftReset(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	MSG_Cache_Type msg;
+
+	if(ProtocolMsg.Para[0] != 0x30)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_PARAMETER;
+		return;
+	}
+
+	msg.Type = MsgType_Reset;
+	msg.Value = MsgValue_NULL;
+	APP_MessagePost(msg);
+}
+
+
 static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
@@ -774,6 +799,67 @@ static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 		return;
 	}
 }
+
+static void SetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+//	DISTANCE_TRIP_POINT_Type dis_point;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+	radar_factory_data_bak.dis_spd_offset_status = ProtocolMsg.Para[0];
+
+	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	{
+		radar_factory_data.dis_spd_offset_status = ProtocolMsg.Para[0];
+	}
+	else
+	{
+		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		return;
+	}
+}
+
+static void SetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+//	DISTANCE_TRIP_POINT_Type dis_point;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+	radar_factory_data_bak.pwm_point = ProtocolMsg.Para[0];
+
+	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	{
+		radar_factory_data.pwm_point = ProtocolMsg.Para[0];
+	}
+	else
+	{
+		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		return;
+	}
+}
+
+static void SetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+//	DISTANCE_TRIP_POINT_Type dis_point;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+	radar_factory_data_bak.cover_point = ProtocolMsg.Para[0];
+
+	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	{
+		radar_factory_data.cover_point = ProtocolMsg.Para[0];
+	}
+	else
+	{
+		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		return;
+	}
+}
+
 
 
 static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)

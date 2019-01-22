@@ -8,8 +8,6 @@
 */
 
 #include "cpu.h"
-//#include "stm32f10x.h"
-
 #include "SCH_Core.h"
 
 /*
@@ -47,12 +45,7 @@
 typedef enum
 {
 	MsgType_NULL				= 0,					/*have no message*/
-	MsgType_BandChange			= 1,
 	MsgType_Reset				= 2,
-	MsgType_LogBackup			= 3,
-//	MsgType_StaticResponse		= 4,
-	MsgType_PowerControl		= 5,
-	MsgType_ResetUdp			= 6,
 	
 
 	MsgType_WDG					= 10,	//send by SCH	SCH_MsgType_WDG = MsgType_WDG
@@ -76,6 +69,7 @@ typedef enum
 	Flag_CoverADelay			= 0x02,
 	Flag_CoverBDelay			= 0x03,
 	Flag_SampleFilter			= 0x04,
+	Flag_DistanceDelay			= 0x05,
 
 }SCH_FLAG_FLAG;
 
@@ -85,14 +79,14 @@ typedef enum
 *                                         FUNCTION PROTOTYPES
 *********************************************************************************************************
 */
-#if 0
+
 void APP_MessageInit(void);
 
 void APP_MessagePost(MSG_Cache_Type msg);
 
 void APP_MessageProcess(void);
 
-#endif
+
 #endif
 
 

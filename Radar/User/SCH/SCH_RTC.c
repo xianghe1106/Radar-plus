@@ -19,7 +19,7 @@
 */
 
 #include "SCH_Core.h"
-//#include "Message.h"
+#include "Message.h"
 
 /*
 *********************************************************************************************************
@@ -78,7 +78,7 @@ void SCH_RTC_Init(INT32U hour, INT8U minute, INT8U second)
 
 void SCH_RTC_Update(void)
 {
-//	MSG_Cache_Type msg;
+	MSG_Cache_Type msg;
 
 	SCH_RTC.msec++;
 
@@ -86,11 +86,11 @@ void SCH_RTC_Update(void)
 	{
 		SCH_RTC.msec = 0;
 		
-//		msg.Type = MsgType_WDG;
-//		msg.Value = MsgValue_NULL;
+		msg.Type = MsgType_WDG;
+		msg.Value = MsgValue_NULL;
 		
 
-//		APP_MessagePost(msg);
+		APP_MessagePost(msg);
 
 		if(++SCH_RTC.second > 59)
 		{

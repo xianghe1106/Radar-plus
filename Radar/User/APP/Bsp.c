@@ -113,7 +113,7 @@ void BSP_HardwareInit(void)
 
 	RADAR_Init();
 
-	PWM_Init();
+//	PWM_Init();
 
 }
 /*------------------------------------------------------------------*-

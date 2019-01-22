@@ -14,9 +14,8 @@
 *********************************************************************************************************
 */
 
-#include <gpio/driver_gpio.h>
 #include "pwm.h"
-#include "radar.h"
+#include "PWM_CCU8/pwm_ccu8.h"
 
 /*
 *********************************************************************************************************
@@ -56,7 +55,7 @@
 *********************************************************************************************************
 */
 
-PWM_SRARUS_Type PWM_STATE;
+//PWM_SRARUS_Type PWM_STATE;
 
 /*
 *********************************************************************************************************
@@ -64,8 +63,8 @@ PWM_SRARUS_Type PWM_STATE;
 *********************************************************************************************************
 */
 
-static void GPIOInit(void);
-static void ParaInit(void);
+//static void GPIOInit(void);
+//static void ParaInit(void);
 
 /*
 *********************************************************************************************************
@@ -73,6 +72,17 @@ static void ParaInit(void);
 *********************************************************************************************************
 */
 
+void PWM_Start(void)
+{
+	PWM_CCU8_Start(&PWM_CCU8_0);
+}
+
+void PWM_Stop(void)
+{
+	PWM_CCU8_Stop(&PWM_CCU8_0);
+}
+
+/*
 
 const DIGITAL_IO_type PWM_PORT =
 {
@@ -109,7 +119,7 @@ void PWM_Update(void)
 {
 	PWM_SRARUS_Type state;
 
-/*	INT8U  buffer[2];
+	INT8U  buffer[2];
 	INT16U cur_distance;
 
 	RADAR_GetDistance(buffer);
@@ -122,7 +132,7 @@ void PWM_Update(void)
 	else
 	{
 		PWM_STATE = PWM_LOW;
-	}*/
+	}
 
 	PWM_GetState(&state);
 
@@ -147,6 +157,7 @@ void PWM_GetState(PWM_SRARUS_Type *state)
 {
 	*state = PWM_STATE;
 }
+*/
 
 
 

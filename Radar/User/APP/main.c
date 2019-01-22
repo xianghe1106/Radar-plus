@@ -56,6 +56,8 @@
 
 #include "driver.h"
 
+#include "Message.h"
+
 /**********************************************************************************************************************
  * MACROS
  **********************************************************************************************************************/
@@ -82,16 +84,18 @@ int main(void)
 
 	BSP_HardwareInit();
 
-	Protocol_init();
-
 	SCH_Init();
+
+	APP_MessageInit();
+
+	Protocol_init();
 
 	/* Add Task */
 //	SCH_Add_Task(RADAR_Test 					, 		1  , 		100  );
 
 //	SCH_Add_Task(Protocol_process 				, 		2  , 		5   );//RADAR_TestTime
 
-	SCH_Add_Task(Protocol_heart_beat 			, 		10 , 		8   );//Protocol_heart_beat
+//	SCH_Add_Task(Protocol_heart_beat 			, 		10 , 		8   );//Protocol_heart_beat
 
 
 
@@ -103,6 +107,7 @@ int main(void)
 	while (1)
 	{
 		SCH_Dispatch_Tasks();
+		APP_MessageProcess();
 
 		Protocol_preprocessing();
 		Protocol_process();

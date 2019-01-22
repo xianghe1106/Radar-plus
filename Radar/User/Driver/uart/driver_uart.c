@@ -119,7 +119,7 @@ void Driver_uart_init(void)
 				XMC_USIC_CH_INTERRUPT_NODE_POINTER_RECEIVE, 1);
 
 	/* enable receive interrupt */
-	NVIC_SetPriority(USIC0_1_IRQn,3);// CMSIS function for NVIC control: NVIC_SetPriority(IRQn_t IRQn, uint32_t priority): priority=0..63
+	NVIC_SetPriority(USIC0_1_IRQn,2);// CMSIS function for NVIC control: NVIC_SetPriority(IRQn_t IRQn, uint32_t priority): priority=0..63
 	NVIC_EnableIRQ(USIC0_1_IRQn);    // CMSIS function for NVIC control: enable IRQn
 }
 

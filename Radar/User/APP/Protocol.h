@@ -29,6 +29,22 @@
  *													- add Radar_DistanceUpdate function to calculate a new distance parameter,
  *													calculate the new distance parameter by formula.
  *
+ *      V1.0.6		2019-01-19		XH
+ *      											- Radar_PWMStateUpdate updated.
+ *      											- Radar_MotionUpdate updated.
+ *      											- Radar_PWMStateUpdate updated.
+ *      											- RADAR_GetAmplitude updated.
+ *      											- Radar_ToiletCoverUpdate updated.
+ *      											- Protocol_heart_beat updated.
+ *      											- protocol: add command 0x85,0x87,0x88,0xA0,0xA8,0xA9.
+ *      											- add Message to this project.
+ *      											- UART IRQ priority changed from 3 to 2.
+ *      											- Protocol_heart_beat called by radarsense2gol_result, not SCH_TASK.
+ *      											- protocol: add command 0x89, 0xAA.
+ *      											- driver_flash.c updated.
+ *      											- ARM-GCC optimization level changed from Os to O1, and do not select Function Section(-fdata-sections)
+ *													- Driver, add timer to generate PWM (GLOBAL_CC8 PWM_CC8), pwm.c and pwm.h updated.
+ *
  *
  */
 
@@ -118,7 +134,7 @@ typedef struct
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							5
+#define BUILD_VERSION							6
 
 #define START_BYTE								0x7E
 #define STOP_BYTE								0x7E

@@ -64,11 +64,14 @@ extern PWM_SRARUS_Type PWM_STATE;
 *********************************************************************************************************
 */
 
-void PWM_Init(void);
+/*void PWM_Init(void);
 void PWM_Update(void);
 
 void PWM_SetState(PWM_SRARUS_Type state);
-void PWM_GetState(PWM_SRARUS_Type *state);
+void PWM_GetState(PWM_SRARUS_Type *state);*/
+
+void PWM_Start(void);
+void PWM_Stop(void);
 
 
 /*

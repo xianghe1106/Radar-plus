@@ -86,6 +86,14 @@ DAVE_STATUS_t Driver_DAVE_Init(void)
 	 /**  Initialization of INTERRUPT APP instance INTERRUPT_0 */
 	 init_status = (DAVE_STATUS_t)INTERRUPT_Init(&INTERRUPT_0); 
    }  
+  if (init_status == DAVE_STATUS_SUCCESS)
+  {
+	 /**  Initialization of PWM_CCU8 APP instance PWM_CCU8_0 */
+	 init_status = (DAVE_STATUS_t)PWM_CCU8_Init(&PWM_CCU8_0);
+
+//	 PWM_CCU8_Start(&PWM_CCU8_0);
+   }
+
   return init_status;
 } /**  End of function DAVE_Init */
 
