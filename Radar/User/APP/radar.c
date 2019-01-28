@@ -869,50 +869,22 @@ void RADAR_GetCoverOpenedTripPoint(INT8U *output)
 void RADAR_GetSignalStrength(INT8U *output)
 {
 	INT8U  buffer[4];
-	INT16U cur_amp;
+	INT16U cur_dis;
 
-	RADAR_GetAmplitude(buffer);
-	cur_amp = get16(buffer);
+	RADAR_GetDistance(buffer);
+	cur_dis = get16(buffer);
 
-	if(cur_amp >= radar_factory_data.cal_table_type.table[0])
+	if(cur_dis <= 10 * radar_factory_data.cal_table_type.minDistance)
 	{
 		output[0] = 100;
 	}
-	else if(cur_amp >= 0.9 * radar_factory_data.cal_table_type.table[0])
+	else if(cur_dis >= 10 * radar_factory_data.cal_table_type.maxDistance)
 	{
-		output[0] = 90;
-	}
-	else if(cur_amp >= 0.8 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 80;
-	}
-	else if(cur_amp >= 0.7 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 70;
-	}
-	else if(cur_amp >= 0.6 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 60;
-	}
-	else if(cur_amp >= 0.5 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 50;
-	}
-	else if(cur_amp >= 0.4 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 40;
-	}
-	else if(cur_amp >= 0.3 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 30;
-	}
-	else if(cur_amp >= 0.2 * radar_factory_data.cal_table_type.table[0])
-	{
-		output[0] = 20;
+		output[0] = 10;
 	}
 	else
 	{
-		output[0] = 10;
+		output[0] = 118 - (9 * cur_dis) / 25;
 	}
 }
 

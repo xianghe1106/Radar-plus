@@ -581,12 +581,22 @@ static void SetBaudRate(ProtocolMsg_TypeDef ProtocolMsg)
 static void GetSummaryInfoEx(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	INT8U buffer[5];
+	XMC_RADARSENSE2GOL_MOTION_t motion;
 
 	RADAR_GetDistance(buffer);
 	ProtocolMsg.Output[0] = buffer[0];	//distance
 	ProtocolMsg.Output[1] = buffer[1];
 
 	RADAR_GetSpeedInCM(buffer);
+	RADAR_GetMotion(&motion);
+	if(motion == XMC_MOTION_DETECT_APPROACHING)
+	{
+		buffer[0] = buffer[0] & 0x0F;
+	}
+	else if(motion == XMC_MOTION_DETECT_DEPARTING)
+	{
+		buffer[0] = buffer[0] | 0xF0;
+	}
 	ProtocolMsg.Output[2] = buffer[0];	//speed
 	ProtocolMsg.Output[3] = buffer[1];
 

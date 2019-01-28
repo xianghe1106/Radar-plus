@@ -54,7 +54,9 @@
  *      											- Message.c updated to support baud rate changes.
  *      											- Bsp.c updated to support baud rate changes.
  *
- *
+ *      V1.0.8		2019-01-28		XH
+ *      											- GetSummaryInfoEx updated.
+ *      											- RADAR_GetSignalStrength updated.
  *
  */
 
@@ -155,7 +157,7 @@ typedef enum
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							7
+#define BUILD_VERSION							8
 
 #define START_BYTE_1							0x41
 #define START_BYTE_2							0x52
