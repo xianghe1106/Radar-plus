@@ -58,7 +58,7 @@ RADAR_USER_DATA_Type	radar_user_data;
 *********************************************************************************************************
 */
 
-
+const INT32U baud_rate_buffer[] = {115200, 57600, 38400, 28800, 19200, 14400, 9600, 4800, 2400, 1200};
 
 /*
 *********************************************************************************************************
@@ -187,17 +187,6 @@ void RADAR_Init(void)
 		radar_factory_data.cal_table_type.planType = 'A';
 		radar_factory_data.cal_table_type.orderType = '1';
 
-	#if 0
-		radar_factory_data.distance.cal_table_type.minDistance = 5;		//0.5m
-		radar_factory_data.distance.cal_table_type.maxDistance = 30;	//3m
-		radar_factory_data.distance.cal_table_type.table[0] = 3544;		//0.5
-		radar_factory_data.distance.cal_table_type.table[1] = 2605;		//1.0 fake
-		radar_factory_data.distance.cal_table_type.table[2] = 1667;		//1.5
-		radar_factory_data.distance.cal_table_type.table[3] = 963;		//2.0
-		radar_factory_data.distance.cal_table_type.table[4] = 660;		//2.5 fake
-		radar_factory_data.distance.cal_table_type.table[5] = 358;		//3.0
-	#endif
-
 		radar_factory_data.cal_table_type.minDistance = 5;		//0.5m
 		radar_factory_data.cal_table_type.maxDistance = 30;	//3m
 
@@ -218,7 +207,16 @@ void RADAR_Init(void)
 	}
 
 
+	FLASH_ReadSpecificPage(flash_page_user, radar_flash_buffer);
+	MEM_Clr(&radar_user_data, sizeof(radar_user_data));
+	MEM_Copy(&radar_user_data, radar_flash_buffer, sizeof(radar_user_data));
+
 	radar_user_data.device_address = 0x30;
+	if((radar_user_data.baud_rate_option == 0)
+	&& (radar_user_data.baud_rate_option > 10))
+	{
+		radar_user_data.baud_rate_option = 0x03;
+	}
 
 	RADAR_CALIBRATION_MODE = FREE_MODE;
 
@@ -347,7 +345,7 @@ void radarsense2gol_result( uint32_t *fft_magnitude_array,
 }
 
 
-void RADAR_FactoryDataInitFromFlash(void)
+/*void RADAR_FactoryDataInitFromFlash(void)
 {
 	INT8U radar_flash_buffer[FLASH_BUFFER_SIZE];
 
@@ -372,14 +370,14 @@ void RADAR_UserDataInitFromDefaults(void)
 		MEM_Copy(&radar_user_data, radar_flash_buffer, sizeof(radar_user_data));
 	}
 
-	if((radar_user_data.device_address < 15)
-	|| (radar_user_data.device_address > 250))
-	{
+//	if((radar_user_data.device_address < 15)
+//	|| (radar_user_data.device_address > 250))
+//	{
 		radar_user_data.device_address = 0x30;
-	}
-}
+//	}
+}*/
 
-__STATIC_INLINE INT16U Distance_GetBufferSum(INT16U *buffer, INT8U size)
+INT16U Distance_GetBufferSum(INT16U *buffer, INT8U size)
 {
 	INT8U  i;
 	INT16U output = 0;
@@ -392,7 +390,7 @@ __STATIC_INLINE INT16U Distance_GetBufferSum(INT16U *buffer, INT8U size)
 	return output;
 }
 
-__STATIC_INLINE INT16U Distance_CalLatestDistance(INT16U cur_amplitude)
+INT16U Distance_CalLatestDistance(INT16U cur_amplitude)
 {
 	INT16U output = 0;
 
@@ -429,7 +427,7 @@ INT16U Distance_CalMaxAmplitude(void)
 	return output;
 }
 
-__STATIC_INLINE void Distance_JitterResistant(XMC_RADARSENSE2GOL_MOTION_t motion, Diatance_Type *depart, Diatance_Type *approach)
+void Distance_JitterResistant(XMC_RADARSENSE2GOL_MOTION_t motion, Diatance_Type *depart, Diatance_Type *approach)
 {
 	if(motion == XMC_MOTION_DETECT_APPROACHING)
 	{
@@ -453,7 +451,7 @@ __STATIC_INLINE void Distance_JitterResistant(XMC_RADARSENSE2GOL_MOTION_t motion
 	}
 }
 
-/*__STATIC_INLINE bool Distance_FilterInvalidData(Diatance_Type *depart, Diatance_Type *approach, INT16U *cur_distance)
+bool Distance_FilterInvalidData(Diatance_Type *depart, Diatance_Type *approach, INT16U *cur_distance)
 {
 	bool status = true;
 	INT16U dis_sum;
@@ -463,67 +461,7 @@ __STATIC_INLINE void Distance_JitterResistant(XMC_RADARSENSE2GOL_MOTION_t motion
 	INT16U cur_speed, dis_offset = 0;
 	DISTANCE_SPEED_OFFSET_Type  speed_status;
 
-	RADAR_GetSpeed(byte_buffer);
-	cur_speed = get16(byte_buffer);
-
-	dis_sum = Distance_GetBufferSum(RADAR_DISTANCE_BUFFER, sizeof(RADAR_DISTANCE_BUFFER) / 2);
-	average_value = dis_sum / (sizeof(RADAR_DISTANCE_BUFFER) / 2);
-
-	dis_offset = (10 * cur_speed) / 36; // 1Km/H = 100000/3600 = 27.7 cm/s = 2.77 cm/100ms
-
-	if(depart->filter_cnt == MOTION_FILTER_CNT)			//depart
-	{
-		if(*cur_distance < average_value)
-		{
-			status = false;
-			return status;
-		}
-
-		delta_distance = *cur_distance - average_value;
-
-		dis_offset = average_value + dis_offset;
-	}
-	else	//approach
-	{
-		if(*cur_distance > average_value)
-		{
-			status = false;
-			return status;
-		}
-
-		delta_distance = average_value - *cur_distance;
-
-		dis_offset = average_value - dis_offset;
-	}
-
-	if(delta_distance > radar_factory_data.distance_point.step)
-	{
-		RADAR_GetDistanceSpeedOffsetStatus(&speed_status);
-		if(speed_status == speed_offset_enable)
-		{
-			*cur_distance = dis_offset;
-		}
-		else
-		{
-			status = false;
-			return status;
-		}
-	}
-
-	return status;
-}*/
-
-__STATIC_INLINE bool Distance_FilterInvalidData(Diatance_Type *depart, Diatance_Type *approach, INT16U *cur_distance)
-{
-	bool status = true;
-	INT16U dis_sum;
-	INT16U average_value;
-	INT16U delta_distance = 0;
-	INT8U  byte_buffer[2];
-	INT16U cur_speed, dis_offset = 0;
-	DISTANCE_SPEED_OFFSET_Type  speed_status;
-
-	RADAR_GetSpeed(byte_buffer);
+	RADAR_GetSpeedInCM(byte_buffer);
 	cur_speed = get16(byte_buffer);
 
 	dis_sum = Distance_GetBufferSum(RADAR_DISTANCE_BUFFER, sizeof(RADAR_DISTANCE_BUFFER) / 2);
@@ -594,7 +532,7 @@ __STATIC_INLINE bool Distance_FilterInvalidData(Diatance_Type *depart, Diatance_
 	return status;
 }
 
-__STATIC_INLINE void Distance_DistanceBufferUpdate(Diatance_Type *depart, Diatance_Type *approach, INT16U cur_distance)
+void Distance_DistanceBufferUpdate(Diatance_Type *depart, Diatance_Type *approach, INT16U cur_distance)
 {
 	INT8U  i;
 	INT16U dis_sum;
@@ -632,7 +570,7 @@ void Radar_DistanceUpdate(void)
 	static INT8U startup = 0;
 	INT16U dis_sum;
 
-	RADAR_GetSpeed(byte_buffer);
+	RADAR_GetSpeedInCM(byte_buffer);
 	cur_speed = get16(byte_buffer);
 	RADAR_GetMotion(&motion);
 
@@ -747,7 +685,8 @@ void Radar_ToiletCoverUpdate(void)
 	RADAR_GetDistance(buffer);
 	cur_distance = get16(buffer);
 
-	RADAR_GetCoverOpenedTripPoint(&cover_point);
+	RADAR_GetCoverOpenedTripPoint(buffer);
+	cover_point = get16(buffer);
 
 	if(cur_distance < cover_point)
 	{
@@ -782,7 +721,7 @@ void Radar_ToiletCoverUpdate(void)
 
 	/* toilet secondary cover control */
 
-	RADAR_GetSpeed(buffer);
+	RADAR_GetSpeedInCM(buffer);
 	cur_speed = get16(buffer);
 
 	RADAR_GetToiletCoverAStatus(&cover_status);
@@ -805,11 +744,23 @@ void RADAR_GetDistance(INT8U *output)
 	output[1] = WORD_LOW(CUR_DISTANCE_VALUE);
 }
 
-void RADAR_GetSpeed(INT8U *output)
+/*void RADAR_GetSpeed(INT8U *output)
 {
 	INT16U speed = 0;
 
 	speed = (10 * g_doppler_velocity);
+
+	output[0] = WORD_HIGH(speed);
+	output[1] = WORD_LOW(speed);
+}*/
+
+void RADAR_GetSpeedInCM(INT8U *output)
+{
+	INT16U speed = 0;
+
+//	speed = (10 * g_doppler_velocity);
+
+	speed = 1000 * g_doppler_velocity / 36;
 
 	output[0] = WORD_HIGH(speed);
 	output[1] = WORD_LOW(speed);
@@ -899,7 +850,8 @@ void RADAR_GetAmplitudeCalValue(INT8U *output)
 
 void RADAR_GetPWMTripPoint(INT8U *output)
 {
-	output[0] = radar_factory_data.pwm_point;
+	output[0] = WORD_HIGH(radar_factory_data.pwm_point);
+	output[1] = WORD_LOW(radar_factory_data.pwm_point);
 }
 
 void RADAR_GetDistanceSpeedOffsetStatus(INT8U *output)
@@ -909,6 +861,122 @@ void RADAR_GetDistanceSpeedOffsetStatus(INT8U *output)
 
 void RADAR_GetCoverOpenedTripPoint(INT8U *output)
 {
-	output[0] = radar_factory_data.cover_point;
+//	output[0] = radar_factory_data.cover_point;
+	output[0] = WORD_HIGH(radar_factory_data.cover_point);
+	output[1] = WORD_LOW(radar_factory_data.cover_point);
+}
+
+void RADAR_GetSignalStrength(INT8U *output)
+{
+	INT8U  buffer[4];
+	INT16U cur_amp;
+
+	RADAR_GetAmplitude(buffer);
+	cur_amp = get16(buffer);
+
+	if(cur_amp >= radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 100;
+	}
+	else if(cur_amp >= 0.9 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 90;
+	}
+	else if(cur_amp >= 0.8 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 80;
+	}
+	else if(cur_amp >= 0.7 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 70;
+	}
+	else if(cur_amp >= 0.6 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 60;
+	}
+	else if(cur_amp >= 0.5 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 50;
+	}
+	else if(cur_amp >= 0.4 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 40;
+	}
+	else if(cur_amp >= 0.3 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 30;
+	}
+	else if(cur_amp >= 0.2 * radar_factory_data.cal_table_type.table[0])
+	{
+		output[0] = 20;
+	}
+	else
+	{
+		output[0] = 10;
+	}
+}
+
+void RADAR_GetDeviceAddress(INT8U *output)
+{
+	output[0] = radar_user_data.device_address;
+}
+
+void RADAR_SetDeviceAddress(INT8U para)
+{
+	radar_user_data.device_address = para;
+}
+
+INT32U RADAR_GetBaudRate(void)
+{
+	INT32U cur_baud_rate;
+
+	switch(radar_user_data.baud_rate_option)
+	{
+	case 1:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 2:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 3:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 4:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 5:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 6:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 7:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 8:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 9:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	case 10:
+		cur_baud_rate = baud_rate_buffer[radar_user_data.baud_rate_option - 1];
+		break;
+
+	default:
+		cur_baud_rate = 2400;
+		break;
+	}
+
+	return cur_baud_rate;
 }
 

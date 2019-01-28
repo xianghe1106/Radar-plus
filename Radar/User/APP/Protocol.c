@@ -42,27 +42,6 @@
 #define PACKET_MAX_LEN						52
 #define PACKET_MAX_ENTRIES					5
 
-
-const INT8U s_aucCrc8LoopupTbl[] =
-{
-       0x00, 0x07, 0x0E, 0x09, 0x1C, 0x1B, 0x12, 0x15,    0x38, 0x3F, 0x36, 0x31, 0x24, 0x23, 0x2A, 0x2D,
-       0x70, 0x77, 0x7E, 0x79, 0x6C, 0x6B, 0x62, 0x65,    0x48, 0x4F, 0x46, 0x41, 0x54, 0x53, 0x5A, 0x5D,
-       0xE0, 0xE7, 0xEE, 0xE9, 0xFC, 0xFB, 0xF2, 0xF5,    0xD8, 0xDF, 0xD6, 0xD1, 0xC4, 0xC3, 0xCA, 0xCD,
-       0x90, 0x97, 0x9E, 0x99, 0x8C, 0x8B, 0x82, 0x85,    0xA8, 0xAF, 0xA6, 0xA1, 0xB4, 0xB3, 0xBA, 0xBD,
-       0xC7, 0xC0, 0xC9, 0xCE, 0xDB, 0xDC, 0xD5, 0xD2,    0xFF, 0xF8, 0xF1, 0xF6, 0xE3, 0xE4, 0xED, 0xEA,
-       0xB7, 0xB0, 0xB9, 0xBE, 0xAB, 0xAC, 0xA5, 0xA2,    0x8F, 0x88, 0x81, 0x86, 0x93, 0x94, 0x9D, 0x9A,
-       0x27, 0x20, 0x29, 0x2E, 0x3B, 0x3C, 0x35, 0x32,    0x1F, 0x18, 0x11, 0x16, 0x03, 0x04, 0x0D, 0x0A,
-       0x57, 0x50, 0x59, 0x5E, 0x4B, 0x4C, 0x45, 0x42,    0x6F, 0x68, 0x61, 0x66, 0x73, 0x74, 0x7D, 0x7A,
-       0x89, 0x8E, 0x87, 0x80, 0x95, 0x92, 0x9B, 0x9C,    0xB1, 0xB6, 0xBF, 0xB8, 0xAD, 0xAA, 0xA3, 0xA4,
-       0xF9, 0xFE, 0xF7, 0xF0, 0xE5, 0xE2, 0xEB, 0xEC,    0xC1, 0xC6, 0xCF, 0xC8, 0xDD, 0xDA, 0xD3, 0xD4,
-       0x69, 0x6E, 0x67, 0x60, 0x75, 0x72, 0x7B, 0x7C,    0x51, 0x56, 0x5F, 0x58, 0x4D, 0x4A, 0x43, 0x44,
-       0x19, 0x1E, 0x17, 0x10, 0x05, 0x02, 0x0B, 0x0C,    0x21, 0x26, 0x2F, 0x28, 0x3D, 0x3A, 0x33, 0x34,
-       0x4E, 0x49, 0x40, 0x47, 0x52, 0x55, 0x5C, 0x5B,    0x76, 0x71, 0x78, 0x7F, 0x6A, 0x6D, 0x64, 0x63,
-       0x3E, 0x39, 0x30, 0x37, 0x22, 0x25, 0x2C, 0x2B,    0x06, 0x01, 0x08, 0x0F, 0x1A, 0x1D, 0x14, 0x13,
-       0xAE, 0xA9, 0xA0, 0xA7, 0xB2, 0xB5, 0xBC, 0xBB,    0x96, 0x91, 0x98, 0x9F, 0x8A, 0x8D, 0x84, 0x83,
-       0xDE, 0xD9, 0xD0, 0xD7, 0xC2, 0xC5, 0xCC, 0xCB,    0xE6, 0xE1, 0xE8, 0xEF, 0xFA, 0xFD, 0xF4, 0xF3
-};
-
 /*
 *********************************************************************************************************
 *                                          LOCAL DATA TYPES
@@ -74,6 +53,12 @@ typedef enum
 	notify_enable = 0,
 	notify_disable = 1
 }NOTIFY_STATE_Type;
+
+typedef enum
+{
+	internal_cmd_enable = 0,
+	internal_cmd_disable = 1
+}INTERNAL_COMMAND_STATE_Type;
 
 typedef enum
 {
@@ -125,12 +110,8 @@ QUEUE8_Type rx_queue, *p_rx_queue = &rx_queue;
 SCAN_PACKET_Type preprocess_buffer/*, process_buffer*/;
 PACKET_BUFFER_Type packet_buffer;
 
-//INT8U  device_address = 0x30;
-NOTIFY_STATE_Type  notify_state = notify_enable;
-//INT8S distance_offset = 0;
-//INT8S amplitude_offset = 0;
-
-
+NOTIFY_STATE_Type  notify_state = notify_disable;
+INTERNAL_COMMAND_STATE_Type internal_cmd_state = internal_cmd_disable;
 
 /*
 *********************************************************************************************************
@@ -138,7 +119,9 @@ NOTIFY_STATE_Type  notify_state = notify_enable;
 *********************************************************************************************************
 */
 
-static INT8U zxUTILS_Crc8(INT8U *ucBuf, INT8U ucLen);
+static void SetBaudRate(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetSummaryInfoEx(ProtocolMsg_TypeDef ProtocolMsg);
+
 
 static void SetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg);
@@ -150,6 +133,7 @@ static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 static void SetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void SetInternalCommandState(ProtocolMsg_TypeDef ProtocolMsg);
 
 
 static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg);
@@ -163,6 +147,7 @@ static void GetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
 static void GetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg);
+static void GetInternalCommandState(ProtocolMsg_TypeDef ProtocolMsg);
 
 
 static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg);
@@ -182,19 +167,19 @@ const struct NEURON neuron[COMMAND_COUNT]=
 {
 	/*-------------------------------------------
 	--
-	-- EX_Protocol Set command : 0x01 to 0x3F
+	-- EX_Protocol Set command :
 	--
 	-------------------------------------------*/
-
-
+	{0x02 	, SetBaudRate							,1 },
+	{0x03 	, SetPWMTripPoint						,2 },
 
 	/*------------------------------------------
 	--
-	-- EX_Protocol Get command : 0x40 to 0x6F
+	-- EX_Protocol Get command :
 	--
 	-------------------------------------------*/
-
-
+	{0x01 	, GetSummaryInfoEx						,10},
+	{0x04 	, GetPWMTripPoint						,2 },
 
 
 	/*---------------------------------------------------
@@ -202,16 +187,17 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	-- Internal set command : 0x80 to 0xAF
 	--
 	----------------------------------------------------*/
-	{0x80 	, SetDeviceAddress						,0 },
-	{0x81 	, SetNotifyState						,0 },
-	{0x82 	, SetDistanceOffset						,0 },
-	{0x83 	, SetAmplitudeOffset					,0 },
-	{0x84 	, SetGestureTripPoint					,0 },
-	{0x85 	, SetSoftReset							,0 },
-	{0x86 	, SetDistanceTripPoint					,0 },
-	{0x87 	, SetDistanceSpeedOffsetState			,0 },
-	{0x88 	, SetPWMTripPoint						,0 },
-	{0x89 	, SetCoverOpenedTripPoint				,0 },
+	{0x80 	, SetDeviceAddress						,1 },
+	{0x81 	, SetNotifyState						,1 },
+	{0x82 	, SetDistanceOffset						,8 },
+	{0x83 	, SetAmplitudeOffset					,2 },
+	{0x84 	, SetGestureTripPoint					,3 },
+	{0x85 	, SetSoftReset							,1 },
+	{0x86 	, SetDistanceTripPoint					,2 },
+	{0x87 	, SetDistanceSpeedOffsetState			,1 },
+//	{0x88 	, SetPWMTripPoint						,2 },
+	{0x89 	, SetCoverOpenedTripPoint				,2 },
+	{0x8A 	, SetInternalCommandState				,1 },
 
 	/*---------------------------------------------------
 	--
@@ -228,8 +214,9 @@ const struct NEURON neuron[COMMAND_COUNT]=
 
 	{0xA7 	, GetDistanceTripPoint					,2 },
 	{0xA8 	, GetDistanceSpeedOffsetState			,1 },
-	{0xA9 	, GetPWMTripPoint						,1 },
-	{0xAA 	, GetCoverOpenedTripPoint				,1 },
+	{0xA9 	, GetPWMTripPoint						,2 },
+	{0xAA 	, GetCoverOpenedTripPoint				,2 },
+	{0xAB 	, GetInternalCommandState				,1 },
 
 
 	/*---------------------------------------------------
@@ -238,7 +225,7 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	--
 	----------------------------------------------------*/
 	{0xD0 	, LoadCalibrationData					,0 },
-	{0xD1 	, SetAmplitudeCalibrationMode			,0 },
+	{0xD1 	, SetAmplitudeCalibrationMode			,1 },
 
 
 	{0xE0 	, GetCalibrationData					,0 },
@@ -270,104 +257,18 @@ void send_uart_data(INT8U *p_buffer, INT16U count)
 {
 	INT16U i;
 
-	XMC_UART_CH_Transmit(XMC_UART0_CH0, 0x7E);
 	for(i = 0; i < count; i++)
 	{
-		if((p_buffer[i] == 0x7E) || ((p_buffer[i] == 0x7D)))
-		{
-			XMC_UART_CH_Transmit(XMC_UART0_CH0, 0x7D);
-			XMC_UART_CH_Transmit(XMC_UART0_CH0, (p_buffer[i] & 0xFF) ^ 0x20);
-		}
-		else
-		{
-			XMC_UART_CH_Transmit(XMC_UART0_CH0, p_buffer[i]);
-		}
-	}
-	XMC_UART_CH_Transmit(XMC_UART0_CH0, 0x7E);
-}
-
-
-void scan_packet(void)
-{
-	INT8U i, start_index = 0, stop_index = 0, frame_flag = 0;
-	INT8U size, index = 0;
-	INT8S offset=0;
-
-	if(preprocess_buffer.count == 0)
-	{
-		return;
-	}
-
-	for(i = 0; i < preprocess_buffer.count; i++)
-	{
-		if(preprocess_buffer.buffer[start_index++] == START_BYTE)
-		{
-			frame_flag++;
-
-			if(preprocess_buffer.buffer[start_index] == START_BYTE)
-			{
-				start_index++;
-			}
-			break;
-		}
-	}
-
-	for(i = 0; i < preprocess_buffer.count; i++)
-	{
-		if(preprocess_buffer.buffer[stop_index++] == START_BYTE)
-		{
-			if((stop_index - start_index) > 1)
-			{
-				frame_flag++;
-				break;
-			}
-		}
-	}
-
-//	return;
-
-	if(frame_flag == 2)//Found a packet.
-	{
-		MEM_Clr(&packet_buffer.buffer[packet_buffer.store_index][0], sizeof(packet_buffer.buffer[packet_buffer.store_index]));
-
-		size = stop_index - start_index + 1;
-		index = 0;
-		for(i = 0; i < size; i++)
-		{
-			if(packet_buffer.buffer[packet_buffer.store_index][index] == 0x7D)
-			{
-				packet_buffer.buffer[packet_buffer.store_index][index] = preprocess_buffer.buffer[start_index - 1  + i] ^ 0x20;
-
-				index++;
-				offset--;
-			}
-			else
-			{
-				packet_buffer.buffer[packet_buffer.store_index][index] = preprocess_buffer.buffer[start_index - 1  + i];
-				if(packet_buffer.buffer[packet_buffer.store_index][index] != 0x7D)
-				{
-					index++;
-				}
-			}
-		}
-
-		packet_buffer.store_index++;
-		packet_buffer.store_index = packet_buffer.store_index % PACKET_MAX_ENTRIES;
-
-
-		size = preprocess_buffer.count - stop_index;
-		for(i = 0; i < (size + offset); i++)
-		{
-			preprocess_buffer.buffer[i] = preprocess_buffer.buffer[stop_index + i];
-		}
-
-		preprocess_buffer.count = size;
+		XMC_UART_CH_Transmit(XMC_UART0_CH0, p_buffer[i]);
 	}
 }
 
 void Protocol_preprocessing(void)
 {
+	INT8U  data;
 	INT32U queue_entries = 0;
+	static PACKET_STATUS_Type packet_state = PACKET_STATUS_START_BYTE_1;
+	static INT8U  para_count = 0;
 
 	if(QUEUE8_GetEntries(p_rx_queue, &queue_entries) != QUEUE_NO_ERROR)
 	{
@@ -376,25 +277,113 @@ void Protocol_preprocessing(void)
 
 	if(queue_entries > 0)
 	{
-		QUEUE8_PopNData(p_rx_queue, &preprocess_buffer.buffer[preprocess_buffer.count], queue_entries);
+		while(queue_entries)
+		{
+			queue_entries--;
+			QUEUE8_Pop(p_rx_queue, &data);
 
-		preprocess_buffer.count += queue_entries;
+			switch(packet_state)
+			{
+				case PACKET_STATUS_START_BYTE_1:
+					if(data == START_BYTE_1)
+					{
+						packet_state = PACKET_STATUS_START_BYTE_2;
+					}
+					break;
+
+				case PACKET_STATUS_START_BYTE_2:
+					if(data == START_BYTE_2)
+					{
+						packet_state = PACKET_STATUS_DEVICE_ADD;
+					}
+					else if(data == START_BYTE_1)
+					{
+						packet_state = PACKET_STATUS_START_BYTE_2;
+					}
+					else
+					{
+						packet_state = PACKET_STATUS_START_BYTE_1;
+					}
+					break;
+
+				case PACKET_STATUS_DEVICE_ADD:
+					packet_state = PACKET_STATUS_LENGTH;
+
+					preprocess_buffer.buffer[0] = START_BYTE_1;
+					preprocess_buffer.buffer[1] = START_BYTE_2;
+					preprocess_buffer.buffer[2] = data;	//add
+					break;
+
+				case PACKET_STATUS_LENGTH:
+					packet_state = PACKET_STATUS_COMMAND;
+
+//					preprocess_buffer.buffer[0] = START_BYTE_1;
+//					preprocess_buffer.buffer[1] = START_BYTE_2;
+//					preprocess_buffer.buffer[2] = add;	//add
+					preprocess_buffer.buffer[3] = data;	//LENGTH
+
+					if(data > 4)
+					{
+						para_count = data - 4;//not include device add, length, command and check sum
+					}
+					else
+					{
+						packet_state = PACKET_STATUS_START_BYTE_1;
+					}
+					break;
+
+				case PACKET_STATUS_COMMAND:
+					packet_state = PACKET_STATUS_PARA_DATA;
+
+//					preprocess_buffer.buffer[0] = START_BYTE_1;
+//					preprocess_buffer.buffer[1] = START_BYTE_2;
+//					preprocess_buffer.buffer[2] = add;	//add
+//					preprocess_buffer.buffer[3] = data;	//LENGTH
+					preprocess_buffer.buffer[4] = data;	//COMMAND
+
+					preprocess_buffer.count = 5;
+					break;
+
+				case PACKET_STATUS_PARA_DATA:
+					preprocess_buffer.buffer[preprocess_buffer.count++] = data;
+					para_count--;
+					if(para_count == 0)
+					{
+						packet_state = PACKET_STATUS_CHECK_SUM;
+					}
+					break;
+
+				case PACKET_STATUS_CHECK_SUM:
+					packet_state = PACKET_STATUS_START_BYTE_1;
+					preprocess_buffer.buffer[preprocess_buffer.buffer[3] + 1] = data;
+
+//					for(i = 0; i < (preprocess_buffer.buffer[3] + 2); i++)
+//					{
+//						packet_buffer.buffer[packet_buffer.store_index][i] = preprocess_buffer.buffer[i];
+//					}
+
+					MEM_Copy(&packet_buffer.buffer[packet_buffer.store_index][0], preprocess_buffer.buffer, preprocess_buffer.buffer[3] + 2);
+
+					packet_buffer.store_index = (packet_buffer.store_index + 1) % PACKET_MAX_ENTRIES;
+					break;
+
+				default:
+					packet_state = PACKET_STATUS_START_BYTE_1;
+					break;
+			}
+		}
 	}
-
-	scan_packet();
 }
 
-INT16U Calculate_SUM_LRC(INT8U *Packet, INT8U length)
+INT16U Calculate_CheckSum(INT8U *Packet, INT8U length)
 {
-	INT16U CHECK_SUM = 0x0000;
+	INT8U  CHECK_SUM = 0;
 	INT8U  i;
 
-	for (i=0; i<length-1; i++)
+	for(i = 0; i < length; i++)
 	{
-		CHECK_SUM = CHECK_SUM+Packet[i];
+		CHECK_SUM = CHECK_SUM + Packet[i];
 	}
-	CHECK_SUM = CHECK_SUM & 0xFF;
-	CHECK_SUM = ((CHECK_SUM ^ 0xFF)+1) & 0xFF;
 
     return CHECK_SUM;
 }
@@ -410,19 +399,20 @@ void Protocol_heart_beat(void)
 		return;
 	}
 
-	ProtocolMsg.Output      = &tx_buffer[4];
+	ProtocolMsg.Output      = &tx_buffer[5];
 	ProtocolMsg.DynamicLen  = &dynamicLen;
 
 	GetSummaryInfo(ProtocolMsg);
 
-	tx_buffer[0] = radar_user_data.device_address;	//device_adress
-	tx_buffer[1] = dynamicLen + 5;	//len
-	tx_buffer[2] = 0x01;	//command
-	tx_buffer[3] = 0x00;	//error code
+	tx_buffer[0] = START_BYTE_1;
+	tx_buffer[1] = START_BYTE_2;
+	tx_buffer[2] = radar_user_data.device_address;	//device_adress
+	tx_buffer[3] = dynamicLen + 4;	//len
+	tx_buffer[4] = 0x70;	//command
 
-	tx_buffer[tx_buffer[1] - 1] = zxUTILS_Crc8(&tx_buffer[0], dynamicLen + 4) & 0xFF;	//check byte
+	tx_buffer[tx_buffer[3] + 1] = Calculate_CheckSum(&tx_buffer[2], tx_buffer[3] - 1);
 
-	send_uart_data(tx_buffer, tx_buffer[1]);
+	send_uart_data(tx_buffer, tx_buffer[3] + 2);
 }
 
 
@@ -433,13 +423,10 @@ void Protocol_process(void)
 	INT16U cmdCode, index;
 	INT16U crcValue;
 //	INT8U  txLen = 0, paraCache[40];
-//	INT8U  cacheSize;
 	INT8U  packet_address;
 	INT8U  *ptr_buffer;
 
 	ProtocolMsg_TypeDef ProtocolMsg;
-
-//	Protocol_preprocessing();
 
 	if(packet_buffer.process_index == packet_buffer.store_index)
 	{
@@ -448,30 +435,32 @@ void Protocol_process(void)
 
 	ptr_buffer = &packet_buffer.buffer[packet_buffer.process_index][0];
 
-	rxLen = ptr_buffer[2];
-	if((ptr_buffer[0] != START_BYTE)
-		|| (ptr_buffer[rxLen + 1] != STOP_BYTE))
+	rxLen = ptr_buffer[3];
+
+	if((ptr_buffer[0] != START_BYTE_1)
+	|| (ptr_buffer[1] != START_BYTE_2))
 	{
-		packet_buffer.process_index++;
-		packet_buffer.process_index = packet_buffer.process_index % PACKET_MAX_ENTRIES;
+		packet_buffer.process_index = (packet_buffer.process_index + 1) % PACKET_MAX_ENTRIES;
 		return;
 	}
 
-	packet_address = ptr_buffer[1];
+	packet_address = ptr_buffer[2];
 	if(packet_address != radar_user_data.device_address)
 	{
-		packet_buffer.process_index++;
-		packet_buffer.process_index = packet_buffer.process_index % PACKET_MAX_ENTRIES;
+		packet_buffer.process_index = (packet_buffer.process_index + 1) % PACKET_MAX_ENTRIES;
 		return;
 	}
 
-	crcValue = zxUTILS_Crc8(&ptr_buffer[1], rxLen - 1);
-	if(crcValue != ptr_buffer[rxLen])
+	crcValue = Calculate_CheckSum(&ptr_buffer[2], rxLen - 1);
+	if(crcValue != ptr_buffer[rxLen + 1])
 	{
 		errorCode = CRC_ERROR;
+
+		packet_buffer.process_index = (packet_buffer.process_index + 1) % PACKET_MAX_ENTRIES;
+		return;
 	}
 
-	cmdCode = ptr_buffer[3];
+	cmdCode = ptr_buffer[4];
 	if(errorCode == CMD_SUCCEED)
 	{
 		//process packet
@@ -493,13 +482,13 @@ void Protocol_process(void)
 
 				//input data
 	//			ProtocolMsg.CommandType = cmdCode >> 15;
-				ProtocolMsg.RxParaLen  	= ptr_buffer[2] - 5;	//number of parameters
-				ProtocolMsg.Para        = &ptr_buffer[4];
+				ProtocolMsg.RxParaLen  	= ptr_buffer[3] - 4;	//number of parameters
+				ProtocolMsg.Para        = &ptr_buffer[5];
 
 				//output data
 				ProtocolMsg.ErrorCode   = &errorCode;
 	//			ProtocolMsg.Output      = &paraCache[0];   	//paraCache
-				ProtocolMsg.Output      = &tx_buffer[4];   	//paraCache
+				ProtocolMsg.Output      = &tx_buffer[5];   	//paraCache
 				ProtocolMsg.DynamicLen  = &dynamicLen;
 				(neuron[index].Cell)(ProtocolMsg);
 				break;
@@ -515,28 +504,29 @@ void Protocol_process(void)
 	}
 
 	//preparing the response packet
-	if(errorCode != CMD_SUCCEED)
+
+	tx_buffer[0] = START_BYTE_1;
+	tx_buffer[1] = START_BYTE_2;
+	tx_buffer[2] = radar_user_data.device_address;
+	tx_buffer[3] = staticLen + dynamicLen + 4;
+	tx_buffer[4] = cmdCode;
+
+//	tx_buffer[3] = errorCode;
+
+	crcValue = Calculate_CheckSum(&tx_buffer[2], tx_buffer[3] - 1);
+
+	tx_buffer[tx_buffer[3] + 1] = crcValue;
+
+	if(errorCode != UNSUPPORT_CMD)
 	{
-		staticLen = 0;
-		dynamicLen = 0;
+		send_uart_data(tx_buffer, tx_buffer[3] + 2);
 	}
 
-	tx_buffer[0] = radar_user_data.device_address;
-	tx_buffer[1] = staticLen + dynamicLen + 5;
-	tx_buffer[2] = cmdCode;
-	tx_buffer[3] = errorCode;
-
-	crcValue = zxUTILS_Crc8(&tx_buffer[0], tx_buffer[1] - 1);
-	tx_buffer[tx_buffer[1] - 1] = crcValue;
-
-	send_uart_data(tx_buffer, tx_buffer[1]);
-
-	packet_buffer.process_index++;
-	packet_buffer.process_index = packet_buffer.process_index % PACKET_MAX_ENTRIES;
+	packet_buffer.process_index = (packet_buffer.process_index + 1) % PACKET_MAX_ENTRIES;
 }
 
 
-static INT8U zxUTILS_Crc8(INT8U *ucBuf, INT8U ucLen)
+/*static INT8U zxUTILS_Crc8(INT8U *ucBuf, INT8U ucLen)
 {
 	INT8U  crc = 0x00;
 
@@ -545,10 +535,107 @@ static INT8U zxUTILS_Crc8(INT8U *ucBuf, INT8U ucLen)
         crc = s_aucCrc8LoopupTbl[crc ^ *ucBuf++];
     }
     return crc ^ 0x55;
+}*/
+
+INTERNAL_COMMAND_STATE_Type GetInternalCommandStatus(void)
+{
+	return internal_cmd_state;
 }
+
+static void SetBaudRate(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_USER_DATA_Type 	radar_user_data_bak;
+	MSG_Cache_Type msg;
+
+	MEM_Copy(&radar_user_data_bak, &radar_user_data, sizeof(radar_user_data));
+
+	radar_user_data_bak.baud_rate_option = ProtocolMsg.Para[0];
+
+	if((radar_user_data_bak.baud_rate_option >= 1)
+	&& (radar_user_data_bak.baud_rate_option <= 10))
+	{
+		if(radar_user_data_bak.baud_rate_option != radar_user_data.baud_rate_option)
+		{
+			if(FLASH_WriteSpecificPage(flash_page_user, (INT8U *)&radar_user_data_bak, sizeof(radar_user_data_bak)) == FLASH_NO_ERROR)
+			{
+				radar_user_data.baud_rate_option = radar_user_data_bak.baud_rate_option;
+
+				msg.Type = MsgType_BaudRate;
+				msg.Value = MsgValue_NULL;
+				APP_MessagePost(msg);
+			}
+			else
+			{
+				*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		//		return;
+			}
+		}
+	}
+
+
+	//output
+	ProtocolMsg.Output[0] = radar_user_data.baud_rate_option;
+}
+
+
+static void GetSummaryInfoEx(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	INT8U buffer[5];
+
+	RADAR_GetDistance(buffer);
+	ProtocolMsg.Output[0] = buffer[0];	//distance
+	ProtocolMsg.Output[1] = buffer[1];
+
+	RADAR_GetSpeedInCM(buffer);
+	ProtocolMsg.Output[2] = buffer[0];	//speed
+	ProtocolMsg.Output[3] = buffer[1];
+
+	RADAR_GetSignalStrength(buffer);
+	ProtocolMsg.Output[4] = buffer[0];
+
+	RADAR_GetToiletCoverBStatus(buffer);
+	ProtocolMsg.Output[5] = buffer[0];
+
+	ProtocolMsg.Output[6] = 0;
+	ProtocolMsg.Output[7] = 0;
+	ProtocolMsg.Output[8] = 0;
+	ProtocolMsg.Output[9] = 0;
+}
+
+/*static void SetPWMTripPointEx(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+//	DISTANCE_TRIP_POINT_Type dis_point;
+
+	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
+
+	radar_factory_data_bak.pwm_point = get16(ProtocolMsg.Para);
+
+	if(radar_factory_data_bak.pwm_point != radar_factory_data.pwm_point)
+	{
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.pwm_point = radar_factory_data_bak.pwm_point;
+		}
+		else
+		{
+			*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		}
+	}
+
+	RADAR_GetPWMTripPoint(ProtocolMsg.Output);
+}*/
+
+
 
 static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	ProtocolMsg.Output[0] = MAJOR_VERSION;
 	ProtocolMsg.Output[1] = MINOR_VERSION;
 	ProtocolMsg.Output[2] = BUILD_VERSION;
@@ -556,17 +643,40 @@ static void GetFirmwareVersion(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	ProtocolMsg.Output[0] = radar_user_data.device_address;
 }
 
 static void GetNotifyState(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	ProtocolMsg.Output[0] = notify_state;
+}
+
+static void GetInternalCommandState(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	ProtocolMsg.Output[0] = internal_cmd_state;
 }
 
 static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	INT8U i;
+
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
 
 	for(i = 0; i < 8; i++)
 	{
@@ -576,12 +686,24 @@ static void GetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.amplitude_offset[0]);
 	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.amplitude_offset[0]);
 }
 
 static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.gesture_dis_point);
 	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.gesture_dis_point);
 
@@ -590,22 +712,46 @@ static void GetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	ProtocolMsg.Output[0] = radar_factory_data.distance_point.step;
 	ProtocolMsg.Output[1] = radar_factory_data.distance_point.speed;
 }
 
 static void GetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	RADAR_GetDistanceSpeedOffsetStatus(ProtocolMsg.Output);
 }
 
 static void GetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	RADAR_GetPWMTripPoint(ProtocolMsg.Output);
 }
 
 static void GetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	RADAR_GetCoverOpenedTripPoint(ProtocolMsg.Output);
 }
 
@@ -619,7 +765,7 @@ static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg)
 	ProtocolMsg.Output[0] = buffer[0];	//distance
 	ProtocolMsg.Output[1] = buffer[1];
 
-	RADAR_GetSpeed(buffer);
+	RADAR_GetSpeedInCM(buffer);
 	ProtocolMsg.Output[2] = buffer[0];	//speed
 	ProtocolMsg.Output[3] = buffer[1];
 
@@ -649,49 +795,76 @@ static void GetSummaryInfo(ProtocolMsg_TypeDef ProtocolMsg)
 static void SetDeviceAddress(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_USER_DATA_Type radar_user_data_bak;
+	INT8U  cur_add;
 
-	if((ProtocolMsg.Para[0] < 15) || (ProtocolMsg.Para[0] < 250))
+	if(GetInternalCommandStatus() != internal_cmd_enable)
 	{
-		*ProtocolMsg.ErrorCode = UNSUPPORT_PARAMETER;
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
 		return;
 	}
 
-	if(radar_user_data.device_address == ProtocolMsg.Para[0])
+	RADAR_GetDeviceAddress(&cur_add);
+
+	if(cur_add != ProtocolMsg.Para[0])
 	{
-		return;
+		MEM_Copy(&radar_user_data_bak, &radar_user_data ,sizeof(radar_user_data));
+		radar_user_data_bak.device_address = ProtocolMsg.Para[0];
+
+
+		if(FLASH_WriteSpecificPage(flash_page_user, (INT8U *)&radar_user_data_bak, sizeof(radar_user_data)) == FLASH_NO_ERROR)
+		{
+//			radar_user_data.device_address = ProtocolMsg.Para[0];
+			RADAR_SetDeviceAddress(ProtocolMsg.Para[0]);
+		}
+		else
+		{
+			*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+	//		return;
+		}
 	}
 
-	MEM_Copy(&radar_user_data_bak, &radar_user_data ,sizeof(radar_user_data));
-	radar_user_data_bak.device_address = ProtocolMsg.Para[0];
-
-
-	if(FLASH_WriteSpecificPage(flash_page_user, (INT8U *)&radar_user_data_bak, sizeof(radar_user_data)) == FLASH_NO_ERROR)
-	{
-		radar_user_data.device_address = ProtocolMsg.Para[0];
-	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+	RADAR_GetDeviceAddress(ProtocolMsg.Output);
 }
 
 static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	if((ProtocolMsg.Para[0] != notify_enable)
-	 &&(ProtocolMsg.Para[0] != notify_disable))
+	if(GetInternalCommandStatus() != internal_cmd_enable)
 	{
-		*ProtocolMsg.ErrorCode = UNSUPPORT_PARAMETER;
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
 		return;
 	}
 
-	notify_state = ProtocolMsg.Para[0];
+	if((ProtocolMsg.Para[0] == notify_enable)
+	 ||(ProtocolMsg.Para[0] == notify_disable))
+	{
+		notify_state = ProtocolMsg.Para[0];
+	}
+
+	ProtocolMsg.Output[0] = notify_state;
+}
+
+static void SetInternalCommandState(ProtocolMsg_TypeDef ProtocolMsg)
+{
+	if((ProtocolMsg.Para[0] == internal_cmd_enable)
+	 ||(ProtocolMsg.Para[0] == internal_cmd_disable))
+	{
+		internal_cmd_state = ProtocolMsg.Para[0];
+	}
+
+	ProtocolMsg.Output[0] = internal_cmd_state;
 }
 
 static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
 	INT8U i;
+	INT8U new_set = 0;
+
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
@@ -700,41 +873,59 @@ static void SetDistanceOffset(ProtocolMsg_TypeDef ProtocolMsg)
 		radar_factory_data_bak.distance_offset[i] = (INT8S)ProtocolMsg.Para[i];
 	}
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	for(i = 0; i < 8; i++)
 	{
-//		radar_factory_data.distance_offset[0] = (INT8S)ProtocolMsg.Para[0];
-
-		for(i = 0; i < 8; i++)
+		if(radar_factory_data_bak.distance_offset[i] != radar_factory_data.distance_offset[i])
 		{
-			radar_factory_data.distance_offset[i] = (INT8S)ProtocolMsg.Para[i];
+			new_set = 1;
+			break;
 		}
 	}
-	else
+
+	if(new_set)
 	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			for(i = 0; i < 8; i++)
+			{
+				radar_factory_data.distance_offset[i] = (INT8S)ProtocolMsg.Para[i];
+			}
+		}
+	}
+
+	//output
+	for(i = 0; i < 8; i++)
+	{
+		ProtocolMsg.Output[i] = radar_factory_data.distance_offset[i];
 	}
 }
 
 static void SetAmplitudeOffset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
-	INT16S para_data;
+	INT16S para_data = 0;
+
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
-	para_data = (INT16S)((ProtocolMsg.Para[0] << 8) + ProtocolMsg.Para[1]);
-	radar_factory_data_bak.amplitude_offset[0] = para_data;
+	radar_factory_data_bak.amplitude_offset[0] = (INT16S)get16(ProtocolMsg.Para);
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	if(radar_factory_data_bak.amplitude_offset[0] != radar_factory_data.amplitude_offset[0])
 	{
-		radar_factory_data.amplitude_offset[0] = para_data;
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.amplitude_offset[0] = para_data;
+		}
 	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+
+	//output
+	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.amplitude_offset[0]);
+	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.amplitude_offset[1]);
 }
 
 static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
@@ -742,39 +933,53 @@ static void SetGestureTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
 	INT16U para_amplitude, para_speed;
 
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
-	para_amplitude = (ProtocolMsg.Para[0] << 8) + ProtocolMsg.Para[1];
+	para_amplitude = get16(ProtocolMsg.Para);
 	para_speed = ProtocolMsg.Para[2];
 
 	radar_factory_data_bak.gesture_dis_point = para_amplitude;
 	radar_factory_data_bak.gesture_spd_point = para_speed;
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	if((radar_factory_data_bak.gesture_dis_point != radar_factory_data.gesture_dis_point)
+	|| (radar_factory_data_bak.gesture_spd_point != radar_factory_data.gesture_spd_point))
 	{
-		radar_factory_data.gesture_dis_point = para_amplitude;
-		radar_factory_data.gesture_spd_point = para_speed;
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.gesture_dis_point = para_amplitude;
+			radar_factory_data.gesture_spd_point = para_speed;
+		}
 	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+
+	ProtocolMsg.Output[0] = WORD_HIGH(radar_factory_data.gesture_dis_point);
+	ProtocolMsg.Output[1] = WORD_LOW(radar_factory_data.gesture_dis_point);
+	ProtocolMsg.Output[2] = radar_factory_data.gesture_spd_point;
 }
 
 static void SetSoftReset(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	MSG_Cache_Type msg;
 
-	if(ProtocolMsg.Para[0] != 0x30)
+	if(GetInternalCommandStatus() != internal_cmd_enable)
 	{
-		*ProtocolMsg.ErrorCode = UNSUPPORT_PARAMETER;
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
 		return;
 	}
 
-	msg.Type = MsgType_Reset;
-	msg.Value = MsgValue_NULL;
-	APP_MessagePost(msg);
+	if(ProtocolMsg.Para[0] == 0x30)
+	{
+		msg.Type = MsgType_Reset;
+		msg.Value = MsgValue_NULL;
+		APP_MessagePost(msg);
+	}
+
+	ProtocolMsg.Output[0] = ProtocolMsg.Para[0];
 }
 
 
@@ -783,21 +988,34 @@ static void SetDistanceTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
 //	DISTANCE_TRIP_POINT_Type dis_point;
 
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
 	radar_factory_data_bak.distance_point.step = ProtocolMsg.Para[0];
 	radar_factory_data_bak.distance_point.speed = ProtocolMsg.Para[1];
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	if((radar_factory_data_bak.distance_point.step != radar_factory_data.distance_point.step)
+	|| (radar_factory_data_bak.distance_point.speed != radar_factory_data.distance_point.speed))
 	{
-		radar_factory_data.distance_point.step = ProtocolMsg.Para[0];
-		radar_factory_data.distance_point.speed = ProtocolMsg.Para[1];
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.distance_point.step = ProtocolMsg.Para[0];
+			radar_factory_data.distance_point.speed = ProtocolMsg.Para[1];
+		}
+		else
+		{
+			*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		}
 	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+
+	//output
+	ProtocolMsg.Output[0] = radar_factory_data.distance_point.step;
+	ProtocolMsg.Output[1] = radar_factory_data.distance_point.speed;
 }
 
 static void SetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg)
@@ -805,59 +1023,93 @@ static void SetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg)
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
 //	DISTANCE_TRIP_POINT_Type dis_point;
 
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
 	radar_factory_data_bak.dis_spd_offset_status = ProtocolMsg.Para[0];
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	if(radar_factory_data_bak.dis_spd_offset_status != radar_factory_data.dis_spd_offset_status)
 	{
-		radar_factory_data.dis_spd_offset_status = ProtocolMsg.Para[0];
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.dis_spd_offset_status = ProtocolMsg.Para[0];
+		}
+		else
+		{
+			*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+		}
 	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+
+
+	ProtocolMsg.Output[0] = radar_factory_data.dis_spd_offset_status;
 }
+
 
 static void SetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
 //	DISTANCE_TRIP_POINT_Type dis_point;
+	INT16U cur_para;
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
-	radar_factory_data_bak.pwm_point = ProtocolMsg.Para[0];
+	cur_para = get16(ProtocolMsg.Para);
+	radar_factory_data_bak.pwm_point = cur_para;
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	if(radar_factory_data_bak.pwm_point != radar_factory_data.pwm_point)
 	{
-		radar_factory_data.pwm_point = ProtocolMsg.Para[0];
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.pwm_point = cur_para;
+		}
+		else
+		{
+			*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+	//		return;
+		}
 	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+
+	//output
+	RADAR_GetPWMTripPoint(ProtocolMsg.Output);
 }
 
 static void SetCoverOpenedTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
 //	DISTANCE_TRIP_POINT_Type dis_point;
+	INT16U cur_para;
+
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
-	radar_factory_data_bak.cover_point = ProtocolMsg.Para[0];
+	cur_para = get16(ProtocolMsg.Para);
+	radar_factory_data_bak.cover_point = cur_para;
 
-	if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+	if(radar_factory_data_bak.cover_point != radar_factory_data.cover_point)
 	{
-		radar_factory_data.cover_point = ProtocolMsg.Para[0];
+		if(FLASH_WriteSpecificPage(flash_page_factory, (INT8U *)&radar_factory_data_bak, sizeof(radar_factory_data_bak)) == FLASH_NO_ERROR)
+		{
+			radar_factory_data.cover_point = cur_para;
+		}
+		else
+		{
+			*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
+	//		return;
+		}
 	}
-	else
-	{
-		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
-	}
+
+	//output
+	RADAR_GetCoverOpenedTripPoint(ProtocolMsg.Output);
 }
 
 
@@ -866,6 +1118,12 @@ static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	INT8U i, size;
 	RADAR_FACTORY_DATA_Type 	radar_factory_data_bak;
+
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
 
 	MEM_Copy(&radar_factory_data_bak, &radar_factory_data, sizeof(radar_factory_data));
 
@@ -890,30 +1148,46 @@ static void LoadCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 	else
 	{
 		*ProtocolMsg.ErrorCode = SYSTEM_BUSY;
-		return;
+//		return;
 	}
+
+	//output
+	*ProtocolMsg.DynamicLen = sizeof(radar_factory_data_bak.cal_table_type);
+	MEM_Copy(ProtocolMsg.Output, &radar_factory_data_bak.cal_table_type.planType, sizeof(radar_factory_data_bak.cal_table_type));
 }
 
 static void SetAmplitudeCalibrationMode(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	if((ProtocolMsg.Para[0] != CALIBRATION_MODE)
-	&& (ProtocolMsg.Para[0] != FREE_MODE))
+	if(GetInternalCommandStatus() != internal_cmd_enable)
 	{
-		*ProtocolMsg.ErrorCode = UNSUPPORT_PARAMETER;
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
 		return;
 	}
 
-	RADAR_SetCalibrationMode(ProtocolMsg.Para[0]);
-
-	if(ProtocolMsg.Para[0] == FREE_MODE)
+	if((ProtocolMsg.Para[0] == CALIBRATION_MODE)
+	|| (ProtocolMsg.Para[0] == FREE_MODE))
 	{
-		RADAR_SetAmplitudeCalValue(0);
+		RADAR_SetCalibrationMode(ProtocolMsg.Para[0]);
+
+		if(ProtocolMsg.Para[0] == FREE_MODE)
+		{
+			RADAR_SetAmplitudeCalValue(0);
+		}
 	}
+
+	//output
+	RADAR_GetCalibrationMode(ProtocolMsg.Output);
 }
 
 static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 {
 	INT8U size, i;
+
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
 
 	*ProtocolMsg.DynamicLen = sizeof(radar_factory_data.cal_table_type);
 
@@ -934,6 +1208,12 @@ static void GetCalibrationData(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetAmplitude(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 //	RADAR_GetAmplitude(ProtocolMsg.Output);
 
 	RADAR_GetAmplitudeCalValue(ProtocolMsg.Output);
@@ -941,6 +1221,12 @@ static void GetAmplitude(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetAmplitudeCalibrationMode(ProtocolMsg_TypeDef ProtocolMsg)
 {
+	if(GetInternalCommandStatus() != internal_cmd_enable)
+	{
+		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+		return;
+	}
+
 	RADAR_GetCalibrationMode(ProtocolMsg.Output);
 }
 

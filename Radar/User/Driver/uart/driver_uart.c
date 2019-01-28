@@ -17,6 +17,7 @@
 #include "driver_uart.h"
 #include "xmc_gpio.h"
 #include "xmc_uart.h"
+#include "radar.h"
 
 /*
 *********************************************************************************************************
@@ -92,12 +93,14 @@ void Driver_uart_init(void)
 	XMC_GPIO_Init(XMC_GPIO_PORT2, 0, &tx_pin_config);
 
 	/* UART configuration */
-	uart_config.baudrate      = UART_BAUDRATE;
+	uart_config.baudrate      = RADAR_GetBaudRate();
 	uart_config.data_bits     = 8U;
 	uart_config.frame_length  = 8U;
 	uart_config.stop_bits     = 1U;
 	uart_config.oversampling  = 16U;
 	uart_config.parity_mode   = XMC_USIC_CH_PARITY_MODE_NONE;
+
+	XMC_UART_CH_Stop(XMC_UART0_CH0);
 
 	/* Configure UART channel */
 	XMC_UART_CH_Init(XMC_UART0_CH0, &uart_config);

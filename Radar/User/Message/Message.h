@@ -46,7 +46,7 @@ typedef enum
 {
 	MsgType_NULL				= 0,					/*have no message*/
 	MsgType_Reset				= 2,
-	
+	MsgType_BaudRate			= 3,
 
 	MsgType_WDG					= 10,	//send by SCH	SCH_MsgType_WDG = MsgType_WDG
 	MsgType_Task				= 11,

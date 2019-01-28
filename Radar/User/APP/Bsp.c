@@ -109,9 +109,8 @@ void BSP_HardwareInit(void)
 //	Driver_led_init();
 
 	Multi_IO_Init();
-	Driver_uart_init();
-
 	RADAR_Init();
+	Driver_uart_init();
 
 //	PWM_Init();
 

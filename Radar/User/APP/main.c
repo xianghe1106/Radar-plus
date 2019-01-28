@@ -91,7 +91,7 @@ int main(void)
 	Protocol_init();
 
 	/* Add Task */
-//	SCH_Add_Task(RADAR_Test 					, 		1  , 		100  );
+	SCH_Add_Task(Protocol_preprocessing 		, 		1  , 		1 );
 
 //	SCH_Add_Task(Protocol_process 				, 		2  , 		5   );//RADAR_TestTime
 
@@ -109,7 +109,7 @@ int main(void)
 		SCH_Dispatch_Tasks();
 		APP_MessageProcess();
 
-		Protocol_preprocessing();
+//		Protocol_preprocessing();
 		Protocol_process();
 
 		RADAR_Process();

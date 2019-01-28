@@ -45,6 +45,16 @@
  *      											- ARM-GCC optimization level changed from Os to O1, and do not select Function Section(-fdata-sections)
  *													- Driver, add timer to generate PWM (GLOBAL_CC8 PWM_CC8), pwm.c and pwm.h updated.
  *
+ *      V1.0.7		2019-01-27		XH
+ *      											- Protocol.c and Protocol.h updated,
+ *      											a. using customer protocol, not the protocol defined by ourself.
+ *      											b. add some internal commands.
+ *      											- Radar.c and Radar.h updated.
+ *      											- driver_uart.c updated.
+ *      											- Message.c updated to support baud rate changes.
+ *      											- Bsp.c updated to support baud rate changes.
+ *
+ *
  *
  */
 
@@ -118,6 +128,17 @@ typedef struct
 	INT8U stop_byte_offset;*/
 }ProtocolOffset_TypeDef;
 
+typedef enum
+{
+	PACKET_STATUS_START_BYTE_1 	= 0,
+	PACKET_STATUS_START_BYTE_2 	= 1,
+	PACKET_STATUS_DEVICE_ADD 	= 2,
+	PACKET_STATUS_LENGTH 		= 3,
+	PACKET_STATUS_COMMAND 		= 4,
+	PACKET_STATUS_PARA_DATA 	= 5,
+	PACKET_STATUS_CHECK_SUM 	= 6
+}PACKET_STATUS_Type;
+
 /*
 *********************************************************************************************************
 *                                          GLOBAL VARIABLES
@@ -134,10 +155,10 @@ typedef struct
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							6
+#define BUILD_VERSION							7
 
-#define START_BYTE								0x7E
-#define STOP_BYTE								0x7E
+#define START_BYTE_1							0x41
+#define START_BYTE_2							0x52
 
 
 

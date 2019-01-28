@@ -23,6 +23,7 @@
 #include "Message.h"
 #include "SCH_Core.h"
 #include "Bsp.h"
+#include "driver.h"
 
 /*
 *********************************************************************************************************
@@ -100,6 +101,10 @@ void APP_MessageProcess(void)
 		case MsgType_Reset:	
 			Bsp_SystemReset();
 		break;
+
+		case MsgType_BaudRate:
+			Driver_uart_init();
+			break;
 
 		default:	//No msgs
 		break;

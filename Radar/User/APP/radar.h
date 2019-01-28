@@ -73,14 +73,15 @@ typedef struct
 	DISTANCE_TRIP_POINT_Type distance_point;
 
 	DISTANCE_SPEED_OFFSET_Type dis_spd_offset_status;
-	INT8U  pwm_point;
-	INT8U  cover_point;
+	INT16U  pwm_point;
+	INT16U  cover_point;
 
 }RADAR_FACTORY_DATA_Type;
 
 typedef struct
 {
 	INT8U device_address;
+	INT8U baud_rate_option;
 }RADAR_USER_DATA_Type;
 
 typedef enum
@@ -157,7 +158,8 @@ void RADAR_Process(void);
 
 /*API*/
 void RADAR_GetDistance(INT8U *output);
-void RADAR_GetSpeed(INT8U *output);
+//void RADAR_GetSpeed(INT8U *output);//in km/h
+void RADAR_GetSpeedInCM(INT8U *output);//in cm/s
 void RADAR_GetSignal(INT8U *output);
 void RADAR_GetAmplitude(INT8U *output);
 void RADAR_GetMotion(INT8U *output);
@@ -172,6 +174,11 @@ void RADAR_GetAmplitudeCalValue(INT8U *output);
 void RADAR_GetPWMTripPoint(INT8U *output);
 void RADAR_GetDistanceSpeedOffsetStatus(INT8U *output);
 void RADAR_GetCoverOpenedTripPoint(INT8U *output);
+void RADAR_GetSignalStrength(INT8U *output);
+void RADAR_GetDeviceAddress(INT8U *output);
+void RADAR_SetDeviceAddress(INT8U para);
+
+INT32U RADAR_GetBaudRate(void);
 
 
 #endif /* USER_APP_RADAR_H_ */
