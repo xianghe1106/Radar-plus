@@ -303,6 +303,7 @@ void radarsense2gol_result( uint32_t *fft_magnitude_array,
 {
 //	INT16U word_buffer[4];
 	RADAR_CALIBRATION_MODE_Type cal_mode;
+	XMC_RADARSENSE2GOL_MOTION_t cur_motion;
 
 	// copy raw data and fft data and motion indicator to global variables used in micrium GUI
 	memcpy(g_sampling_data_I, adc_aqc_array_I, size_of_array_acq * sizeof(uint16_t));
@@ -342,6 +343,14 @@ void radarsense2gol_result( uint32_t *fft_magnitude_array,
 
 
 	Protocol_heart_beat();
+
+	RADAR_GetMotion(&cur_motion);
+	if((cur_motion == XMC_MOTION_DETECT_APPROACHING)
+	|| (cur_motion == XMC_MOTION_DETECT_DEPARTING))
+	{
+		Protocol_heart_beat_ex();
+	}
+
 }
 
 

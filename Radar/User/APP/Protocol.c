@@ -48,10 +48,17 @@
 *********************************************************************************************************
 */
 
-typedef enum
+/*typedef enum
 {
 	notify_enable = 0,
 	notify_disable = 1
+}NOTIFY_STATE_Type;*/
+
+typedef enum
+{
+	notify_disable 	= 0,
+	notify_internal = 1,
+	notify_external = 2,
 }NOTIFY_STATE_Type;
 
 typedef enum
@@ -110,7 +117,7 @@ QUEUE8_Type rx_queue, *p_rx_queue = &rx_queue;
 SCAN_PACKET_Type preprocess_buffer/*, process_buffer*/;
 PACKET_BUFFER_Type packet_buffer;
 
-NOTIFY_STATE_Type  notify_state = notify_disable;
+NOTIFY_STATE_Type  notify_state = notify_external;
 INTERNAL_COMMAND_STATE_Type internal_cmd_state = internal_cmd_disable;
 
 /*
@@ -178,7 +185,7 @@ const struct NEURON neuron[COMMAND_COUNT]=
 	-- EX_Protocol Get command :
 	--
 	-------------------------------------------*/
-	{0x01 	, GetSummaryInfoEx						,10},
+	{0x01 	, GetSummaryInfoEx						,0 },
 	{0x04 	, GetPWMTripPoint						,2 },
 
 
@@ -322,7 +329,11 @@ void Protocol_preprocessing(void)
 //					preprocess_buffer.buffer[2] = add;	//add
 					preprocess_buffer.buffer[3] = data;	//LENGTH
 
-					if(data > 4)
+					if(data > 40)
+					{
+						packet_state = PACKET_STATUS_START_BYTE_1;
+					}
+					else if(data > 4)
 					{
 						para_count = data - 4;//not include device add, length, command and check sum
 					}
@@ -394,7 +405,7 @@ void Protocol_heart_beat(void)
 	ProtocolMsg_TypeDef ProtocolMsg;
 	INT8U  dynamicLen = 0;
 
-	if(notify_state != notify_enable)
+	if(notify_state != notify_internal)
 	{
 		return;
 	}
@@ -409,6 +420,33 @@ void Protocol_heart_beat(void)
 	tx_buffer[2] = radar_user_data.device_address;	//device_adress
 	tx_buffer[3] = dynamicLen + 4;	//len
 	tx_buffer[4] = 0x70;	//command
+
+	tx_buffer[tx_buffer[3] + 1] = Calculate_CheckSum(&tx_buffer[2], tx_buffer[3] - 1);
+
+	send_uart_data(tx_buffer, tx_buffer[3] + 2);
+}
+
+void Protocol_heart_beat_ex(void)
+{
+	INT8U  tx_buffer[30];
+	ProtocolMsg_TypeDef ProtocolMsg;
+	INT8U  dynamicLen = 0;
+
+	if(notify_state != notify_external)
+	{
+		return;
+	}
+
+	ProtocolMsg.Output      = &tx_buffer[5];
+	ProtocolMsg.DynamicLen  = &dynamicLen;
+
+	GetSummaryInfoEx(ProtocolMsg);
+
+	tx_buffer[0] = START_BYTE_1;
+	tx_buffer[1] = START_BYTE_2;
+	tx_buffer[2] = radar_user_data.device_address;	//device_adress
+	tx_buffer[3] = dynamicLen + 4;	//len
+	tx_buffer[4] = 0x01;	//command
 
 	tx_buffer[tx_buffer[3] + 1] = Calculate_CheckSum(&tx_buffer[2], tx_buffer[3] - 1);
 
@@ -583,6 +621,8 @@ static void GetSummaryInfoEx(ProtocolMsg_TypeDef ProtocolMsg)
 	INT8U buffer[5];
 	XMC_RADARSENSE2GOL_MOTION_t motion;
 
+	*ProtocolMsg.DynamicLen = 10;
+
 	RADAR_GetDistance(buffer);
 	ProtocolMsg.Output[0] = buffer[0];	//distance
 	ProtocolMsg.Output[1] = buffer[1];
@@ -745,11 +785,11 @@ static void GetDistanceSpeedOffsetState(ProtocolMsg_TypeDef ProtocolMsg)
 
 static void GetPWMTripPoint(ProtocolMsg_TypeDef ProtocolMsg)
 {
-	if(GetInternalCommandStatus() != internal_cmd_enable)
-	{
-		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
-		return;
-	}
+//	if(GetInternalCommandStatus() != internal_cmd_enable)
+//	{
+//		*ProtocolMsg.ErrorCode = UNSUPPORT_CMD;
+//		return;
+//	}
 
 	RADAR_GetPWMTripPoint(ProtocolMsg.Output);
 }
@@ -844,8 +884,9 @@ static void SetNotifyState(ProtocolMsg_TypeDef ProtocolMsg)
 		return;
 	}
 
-	if((ProtocolMsg.Para[0] == notify_enable)
-	 ||(ProtocolMsg.Para[0] == notify_disable))
+	if((ProtocolMsg.Para[0] == notify_disable)
+	 ||(ProtocolMsg.Para[0] == notify_internal)
+	 ||(ProtocolMsg.Para[0] == notify_external))
 	{
 		notify_state = ProtocolMsg.Para[0];
 	}

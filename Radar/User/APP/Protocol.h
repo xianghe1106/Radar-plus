@@ -58,6 +58,15 @@
  *      											- GetSummaryInfoEx updated.
  *      											- RADAR_GetSignalStrength updated.
  *
+ *      V1.0.9		2019-01-29		XH
+ *      											- GetPWMTripPoint updated.
+ *      											- Protocol_preprocessing updated.
+ *													- the default value of notify_state changed from notify_disable to notify_external.
+ *													- SetNotifyState updated.
+ *													- Protocol_heart_beat updated.
+ *													- GetSummaryInfoEx updated.
+ *													- radarsense2gol_result updated: call Protocol_heart_beat_ex.
+ *
  */
 
 #ifndef USER_APP_PROTOCOL_H_
@@ -157,7 +166,7 @@ typedef enum
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							8
+#define BUILD_VERSION							9
 
 #define START_BYTE_1							0x41
 #define START_BYTE_2							0x52
@@ -185,6 +194,7 @@ void Protocol_init(void);
 void Protocol_preprocessing(void);
 void Protocol_process(void);
 void Protocol_heart_beat(void);
+void Protocol_heart_beat_ex(void);
 void Protocol_RaderSamplingData(void);
 
 
