@@ -67,6 +67,13 @@
  *													- GetSummaryInfoEx updated.
  *													- radarsense2gol_result updated: call Protocol_heart_beat_ex.
  *
+ *      V1.0.10		2019-02-18		XH
+ *      											- Fix the initialization of radar_user_data.baud_rate_option.
+ *      											- The default baud rate changed from 38400 to 2400.
+ *      											- Radar_ToiletCoverUpdate updated, and add Radar_GetGestureState.
+ *      											- GetSummaryInfoEx updated.
+ *      											- The default value of CUR_DISTANCE_VALUE and RADAR_DISTANCE_BUFFER is radar_factory_data.cover_point + 1.
+ *
  */
 
 #ifndef USER_APP_PROTOCOL_H_
@@ -166,7 +173,7 @@ typedef enum
 
 #define MAJOR_VERSION							1	// from 0 to 9
 #define MINOR_VERSION							0	// from 0 to 9
-#define BUILD_VERSION							9
+#define BUILD_VERSION							10
 
 #define START_BYTE_1							0x41
 #define START_BYTE_2							0x52

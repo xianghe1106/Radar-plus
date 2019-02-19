@@ -177,6 +177,7 @@ void RADAR_GetCoverOpenedTripPoint(INT8U *output);
 void RADAR_GetSignalStrength(INT8U *output);
 void RADAR_GetDeviceAddress(INT8U *output);
 void RADAR_SetDeviceAddress(INT8U para);
+bool Radar_GetGestureState(void);
 
 INT32U RADAR_GetBaudRate(void);
 

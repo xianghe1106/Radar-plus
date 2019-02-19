@@ -165,6 +165,7 @@ void RADAR_Test(void)
 void RADAR_Init(void)
 {
 	INT8U radar_flash_buffer[FLASH_BUFFER_SIZE];
+	INT8U i;
 
 	radarsense2gol_init(
 			radarsense2gol_timing,
@@ -213,12 +214,19 @@ void RADAR_Init(void)
 
 	radar_user_data.device_address = 0x30;
 	if((radar_user_data.baud_rate_option == 0)
-	&& (radar_user_data.baud_rate_option > 10))
+	|| (radar_user_data.baud_rate_option > 10))
 	{
-		radar_user_data.baud_rate_option = 0x03;
+		radar_user_data.baud_rate_option = 0x09;
 	}
 
 	RADAR_CALIBRATION_MODE = FREE_MODE;
+
+	CUR_DISTANCE_VALUE = radar_factory_data.cover_point + 1;
+
+	for(i = 0; i < DISTANCE_BUFFER_SIZE; i++)
+	{
+		RADAR_DISTANCE_BUFFER[i] = radar_factory_data.cover_point + 1;
+	}
 
 	MEM_Clr(&dis_depart, sizeof(dis_depart));
 	MEM_Clr(&dis_approach, sizeof(dis_approach));
@@ -682,11 +690,39 @@ void Radar_PWMStateUpdate(void)
 	}
 }
 
-void Radar_ToiletCoverUpdate(void)
+bool Radar_GetGestureState(void)
 {
+	bool status = true;
 	INT8U  buffer[5];
 	INT16U cur_speed, cur_distance;
 	RADAR_TOILET_COVER_Type cover_status;
+
+	RADAR_GetDistance(buffer);
+	cur_distance = get16(buffer);
+	RADAR_GetSpeedInCM(buffer);
+	cur_speed = get16(buffer);
+
+	RADAR_GetToiletCoverAStatus(&cover_status);
+
+	if((cur_speed > radar_factory_data.gesture_spd_point)
+	&& (cover_status == TOILET_COVER_OPENED)
+	&& (cur_distance > radar_factory_data.gesture_dis_point))
+	{
+		status = true;
+	}
+	else
+	{
+		status = false;
+	}
+
+	return status;
+}
+
+void Radar_ToiletCoverUpdate(void)
+{
+	INT8U  buffer[5];
+	INT16U cur_distance;
+//	RADAR_TOILET_COVER_Type cover_status;
 	RADAR_TOILET_COVER_Type cover_b_state;
 	INT8U  cover_point;
 
@@ -730,14 +766,15 @@ void Radar_ToiletCoverUpdate(void)
 
 	/* toilet secondary cover control */
 
-	RADAR_GetSpeedInCM(buffer);
-	cur_speed = get16(buffer);
+//	RADAR_GetSpeedInCM(buffer);
+//	cur_speed = get16(buffer);
 
-	RADAR_GetToiletCoverAStatus(&cover_status);
+//	RADAR_GetToiletCoverAStatus(&cover_status);
 
-	if((cur_speed > radar_factory_data.gesture_spd_point)
-	&& (cover_status == TOILET_COVER_OPENED)
-	&& (cur_distance > radar_factory_data.gesture_dis_point))
+//	if((cur_speed > radar_factory_data.gesture_spd_point)
+//	&& (cover_status == TOILET_COVER_OPENED)
+//	&& (cur_distance > radar_factory_data.gesture_dis_point))
+	if(Radar_GetGestureState() == true)
 	{
 //		state = GESTURE_DETECTED;
 

@@ -643,8 +643,17 @@ static void GetSummaryInfoEx(ProtocolMsg_TypeDef ProtocolMsg)
 	RADAR_GetSignalStrength(buffer);
 	ProtocolMsg.Output[4] = buffer[0];
 
-	RADAR_GetToiletCoverBStatus(buffer);
-	ProtocolMsg.Output[5] = buffer[0];
+//	RADAR_GetToiletCoverBStatus(buffer);
+//	ProtocolMsg.Output[5] = buffer[0];
+
+	if(Radar_GetGestureState() == true)
+	{
+		ProtocolMsg.Output[5] = 0x01;
+	}
+	else
+	{
+		ProtocolMsg.Output[5] = 0x00;
+	}
 
 	ProtocolMsg.Output[6] = 0;
 	ProtocolMsg.Output[7] = 0;
