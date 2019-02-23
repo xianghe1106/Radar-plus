@@ -674,7 +674,7 @@ void Radar_PWMStateUpdate(void)
 	INT8U  pwm_point;
 
 	RADAR_GetDistance(byte_buffer);
-	get16(byte_buffer);
+//	get16(byte_buffer);
 
 //	if(get16(byte_buffer) <= 150)
 	RADAR_GetPWMTripPoint(&pwm_point);
