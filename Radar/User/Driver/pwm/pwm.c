@@ -57,6 +57,8 @@
 
 //PWM_SRARUS_Type PWM_STATE;
 
+//bool pwm_state = false;
+
 /*
 *********************************************************************************************************
 *                                      LOCAL FUNCTION PROTOTYPES
@@ -74,12 +76,20 @@
 
 void PWM_Start(void)
 {
-	PWM_CCU8_Start(&PWM_CCU8_0);
+//	if(pwm_state == false)
+//	{
+//		pwm_state = true;
+		PWM_CCU8_Start(&PWM_CCU8_0);
+//	}
 }
 
 void PWM_Stop(void)
 {
-	PWM_CCU8_Stop(&PWM_CCU8_0);
+//	if(pwm_state == true)
+//	{
+//		pwm_state = false;
+		PWM_CCU8_Stop(&PWM_CCU8_0);
+//	}
 }
 
 /*

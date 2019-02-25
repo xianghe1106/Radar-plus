@@ -671,14 +671,15 @@ void Radar_MotionUpdate(XMC_RADARSENSE2GOL_MOTION_t motion)
 void Radar_PWMStateUpdate(void)
 {
 	INT8U  byte_buffer[4];
-	INT8U  pwm_point;
+	INT16U pwm_point, cur_dis;
 
 	RADAR_GetDistance(byte_buffer);
-//	get16(byte_buffer);
+	cur_dis = get16(byte_buffer);
 
-//	if(get16(byte_buffer) <= 150)
-	RADAR_GetPWMTripPoint(&pwm_point);
-	if(get16(byte_buffer) <= pwm_point)
+	RADAR_GetPWMTripPoint(byte_buffer);
+	pwm_point = get16(byte_buffer);
+
+	if(cur_dis <= pwm_point)
 	{
 //		PWM_SetState(PWM_ENABLE);
 		PWM_Start();
