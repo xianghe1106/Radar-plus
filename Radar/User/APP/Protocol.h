@@ -75,7 +75,7 @@
  *      											- The default value of CUR_DISTANCE_VALUE and RADAR_DISTANCE_BUFFER is radar_factory_data.cover_point + 1.
  *
  *      V1.0.11		2019-02-25		XH
- *      											- Radar_PWMStateUpdate updated.
+ *      											- Radar_PWMStateUpdate updated, because there is no PWM output.
  */
 
 #ifndef USER_APP_PROTOCOL_H_
